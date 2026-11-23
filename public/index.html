@@ -37,6 +37,7 @@ button.danger{border-color:var(--err);color:var(--err)}
 .glow{animation:pulse 2.5s infinite}
 @keyframes pulse{0%,100%{text-shadow:0 0 8px var(--holo)}50%{text-shadow:0 0 22px var(--holo)}}
 label{font-size:12px;color:var(--dim)}
+#diag{font-size:11px;color:var(--dim);max-height:120px;overflow:auto;border:1px dashed #0a2236;padding:6px;margin-top:8px;display:none}
 </style>
 </head>
 <body>
@@ -60,6 +61,7 @@ label{font-size:12px;color:var(--dim)}
     <button onclick="login()">ВОЙТИ В АРХИВ</button>
   </div>
   <div id="authMsg" class="msg"></div>
+  <div id="diag"></div>
 </div>
 
 <div id="mainScreen" class="hidden">
@@ -141,10 +143,13 @@ const te=new TextEncoder(), td=new TextDecoder();
 function b64(buf){const a=new Uint8Array(buf);let s="";for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(s);}
 function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
 function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
-function msg(id,t,ok){const el=document.getElementById(id);el.textContent=t;el.className="msg "+(ok?"ok":"err");setTimeout(()=>el.className="msg",6000);}
-function busy(on){document.querySelectorAll("button").forEach(b=>b.disabled=on);}
+function msg(id,t,ok){const el=document.getElementById(id);el.textContent=t;el.className="msg "+(ok?"ok":"err");setTimeout(()=>el.className="msg",8000);}
+function D(t){const el=document.getElementById("diag");if(!el)return;el.style.display="block";const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+" › "+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log("[КОДЕКС]",t);}
+function busy(on){document.querySelectorAll("#authScreen button, #mainScreen button").forEach(b=>b.disabled=on);}
+function withTimeout(promise,ms,label){
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" — таймаут "+ms+"мс (Worker не ответил). Проверь деплой и bindings.")),ms))]);
+}
 
-/* крипто — в браузере, 250k итераций */
 async function derive(pass,salt){
   const km=await crypto.subtle.importKey("raw",te.encode(pass),"PBKDF2",false,["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:unb64(salt),iterations:250000,hash:"SHA-256"},km,256));
@@ -166,14 +171,15 @@ async function api(path,method,body){
   const opt={method:method||"GET",headers:{}};
   if(TOKEN)opt.headers["x-token"]=TOKEN;
   if(body!==undefined){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body);}
-  const r=await fetch("/api"+path,opt);
-  const data=await r.json().catch(()=>({}));
+  const r=await withTimeout(fetch("/api"+path,opt),20000,"запрос "+path);
+  let data;
+  try{data=await r.json();}catch(e){throw new Error("Worker вернул не-JSON (возможно, старая версия или ошибка 1102). Статус: "+r.status);}
   if(!r.ok){if(r.status===401&&ME){alert("Сеанс истёк. Войдите заново.");doLogoutUI();}throw new Error(data.error||("Ошибка связи: "+r.status));}
   return data;
 }
 async function guard(fn,errTarget){
-  try{busy(true);await fn();}
-  catch(e){if(errTarget)msg(errTarget,e.message,false);else alert(e.message);}
+  try{busy(true);D("начало операции…");await fn();D("готово ✓");}
+  catch(e){D("ОШИБКА: "+e.message);if(errTarget)msg(errTarget,e.message,false);else alert(e.message);}
   finally{busy(false);}
 }
 
@@ -182,7 +188,8 @@ async function setup(){await guard(async()=>{
   const p=document.getElementById("setupPass").value,p2=document.getElementById("setupPass2").value;
   if(!p||p!==p2||p.length<8)throw new Error("Ключи пусты, не совпадают или короче 8 знаков.");
   const salt=randSalt();
-  await api("/setup","POST",{name:n,salt,verifier:await makeVerifier(p,salt)});
+  D("деривация пароля (250k)…");const v=await makeVerifier(p,salt);D("хеш готов");
+  await api("/setup","POST",{name:n,salt,verifier:v});
   const raw=crypto.getRandomValues(new Uint8Array(32));
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
   document.getElementById("setupBlock").classList.add("hidden");
@@ -193,13 +200,18 @@ async function setup(){await guard(async()=>{
 
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
-  const st=await fetch("/api/salt?name="+encodeURIComponent(nm)).then(r=>r.json());
-  if(!st.salt)throw new Error("Оператор не найден.");
+  if(!nm)throw new Error("Введи имя оператора.");
+  D("запрос соли для "+nm+"…");
+  const st=await withTimeout(fetch("/api/salt?name="+encodeURIComponent(nm)),20000,"получение соли").then(r=>r.json()).catch(e=>{throw new Error("Не удалось получить соль: "+e.message);});
+  if(!st.salt)throw new Error("Оператор «"+nm+"» не найден в Архиве.");
+  D("соль получена, деривация пароля (250k, ~1-3 сек)…");
+  const t0=performance.now();const v=await makeVerifier(p,st.salt);D("хеш готов за "+Math.round(performance.now()-t0)+"мс");
   const hash=location.hash;
-  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона! Открой Архив по ссылке-приглашению …#k=… от Магистра.");
-  const d=await api("/login","POST",{name:nm,verifier:await makeVerifier(p,st.salt)});
+  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Открой Архив по полной ссылке-приглашению …#k=… от Магистра (не просто project-kodex).");
+  D("проверка доступа на сервере…");
+  const d=await api("/login","POST",{name:nm,verifier:v});
   let ks=hash.slice(3).replace(/-/g,"+").replace(/_/g,"/");while(ks.length%4)ks+="=";
-  VAULT=await importVault(unb64(ks));
+  D("импорт ключа Голокрона…");VAULT=await importVault(unb64(ks));
   TOKEN=d.token;ME=d;
   sessionStorage.setItem("jedi_token",TOKEN);sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
   await enterMain();
@@ -270,7 +282,7 @@ async function viewRecord(id){await guard(async()=>{
   showTabRaw("view");
 });}
 async function downloadFile(fid,name){await guard(async()=>{
-  const r=await fetch("/api/files/"+fid,{headers:{"x-token":TOKEN}});
+  const r=await withTimeout(fetch("/api/files/"+fid,{headers:{"x-token":TOKEN}}),30000,"скачивание");
   if(!r.ok)throw new Error("Недостаточный допуск или файл не найден.");
   const blob=await r.blob();
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();
@@ -303,6 +315,7 @@ async function openEditor(id){await guard(async()=>{
 async function saveRecord(){await guard(async()=>{
   const title=document.getElementById("edTitle").value.trim();
   if(!title)throw new Error("Пустое название — Архив не принимает.");
+  D("шифрование тела записи…");
   const payload={title,
     category:document.getElementById("edCat").value,
     clearance:parseInt(document.getElementById("edClear").value),
@@ -315,7 +328,7 @@ async function saveRecord(){await guard(async()=>{
   const fi=document.getElementById("edFiles");
   if(fi.files.length){
     const fd=new FormData();for(const f of fi.files)fd.append("files",f);
-    const r=await fetch("/api/records/"+id+"/files",{method:"POST",headers:{"x-token":TOKEN},body:fd});
+    const r=await withTimeout(fetch("/api/records/"+id+"/files",{method:"POST",headers:{"x-token":TOKEN},body:fd}),30000,"загрузка файлов");
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||"Ошибка загрузки файлов");}
   }
   msg("edMsg","✓ Запись "+(code||"")+" сохранена.",true);
@@ -363,14 +376,16 @@ async function backup(){await guard(async()=>{
   a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json";a.click();
 });}
 (async()=>{
+  D("инициализация КОДЕКСА…");
   try{
-    const st=await fetch("/api/status").then(r=>r.json());
+    const st=await withTimeout(fetch("/api/status"),15000,"проверка статуса").then(r=>r.json());
+    D("статус получен, initialized="+st.initialized);
     if(!st.initialized){document.getElementById("setupBlock").classList.remove("hidden");return;}
     const ks=sessionStorage.getItem("jedi_key");
     if(TOKEN&&ME&&ks){VAULT=await importVault(unb64(ks));try{CATS=await api("/categories");await enterMain();return;}catch(e){doLogoutUI();}}
     document.getElementById("loginBlock").classList.remove("hidden");
-    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ссылка-ключ Голокрона от Магистра (вид …#k=…).",false);
-  }catch(e){msg("authMsg","Храм недоступен: "+e.message,false);}
+    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка-ключ Голокрона от Магистра (вид …workers.dev/#k=…). Просто project-kodex не сработает.",false);
+  }catch(e){D("FAIL init: "+e.message);msg("authMsg","Храм недоступен: "+e.message,false);}
 })();
 </script>
 </body>
