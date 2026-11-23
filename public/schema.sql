@@ -8,7 +8,7 @@ CREATE TABLE IF NOT EXISTS records(
   clearance INTEGER, tags TEXT, body_enc TEXT, source TEXT, author TEXT, created TEXT, updated TEXT);
 CREATE TABLE IF NOT EXISTS attachments(
   id INTEGER PRIMARY KEY AUTOINCREMENT, record_id INTEGER, filename TEXT,
-  r2key TEXT, sha256 TEXT, size INTEGER);
+  sha256 TEXT, size INTEGER, data TEXT);
 CREATE TABLE IF NOT EXISTS journal(id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT, op TEXT, action TEXT, detail TEXT);
 CREATE TABLE IF NOT EXISTS sessions(token TEXT PRIMARY KEY, name TEXT, vault_key TEXT, expires INTEGER);
 INSERT OR IGNORE INTO categories VALUES('ДОСЬЕ','ДОС'),('АНОМАЛИЯ','АНО'),('АРТЕФАКТ','АРТ'),('ПРОТОКОЛ','ПРТ'),('ЛОКАЦИЯ','ЛОК'),('ЗНАНИЕ','ЗНН');
