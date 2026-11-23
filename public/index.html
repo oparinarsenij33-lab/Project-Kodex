@@ -1,8 +1,0 @@
-async function backup(){
-  try{
-    const data=await api("/backup");
-    const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
-    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
-    a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json"; a.click();
-  }catch(e){ alert(e.message); }
-}
