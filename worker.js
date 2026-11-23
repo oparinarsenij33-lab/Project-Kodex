@@ -1,4 +1,8 @@
-// КОДЕКС v2 — Worker-курьер. Криптография на клиенте, CPU < 10 мс.
+// ═══════════════════════════════════════════════════════════
+//  КОДЕКС v2 — АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ
+//  Cloudflare Worker + D1. Криптография на клиенте, CPU < 10 мс.
+//  Биндинги: DB (D1), ASSETS (статика). /api/salt уже встроен.
+// ═══════════════════════════════════════════════════════════
 const now = () => new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
 const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 function json(d, s = 200) { return new Response(JSON.stringify(d), { status: s, headers: { "Content-Type": "application/json" } }); }
@@ -7,12 +11,18 @@ async function log(env, op, action, detail) {
 }
 export default {
   async fetch(request, env) {
-    const p = new URL(request.url).pathname;
+    const url = new URL(request.url);
+    const p = url.pathname;
     if (!p.startsWith("/api/")) return env.ASSETS.fetch(request);
     try {
       if (p === "/api/status") {
         const r = await env.DB.prepare("SELECT COUNT(*) c FROM users").first();
         return json({ initialized: r.c > 0 });
+      }
+      if (p === "/api/salt") {
+        const nm = url.searchParams.get("name") || "";
+        const u = await env.DB.prepare("SELECT salt FROM users WHERE name=?").bind(nm).first();
+        return json({ salt: u ? u.salt : null });
       }
       if (p === "/api/setup" && request.method === "POST") {
         const r = await env.DB.prepare("SELECT COUNT(*) c FROM users").first();
