@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>КОДЕКС — АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ</title>
+<style>
+:root{--bg:#020610;--panel:#061224;--holo:#4fc3f7;--holo2:#81d4fa;--dim:#1b4a6b;--warn:#ffb74d;--err:#ef5350;--ok:#69f0ae}
+*{box-sizing:border-box;margin:0;padding:0}
+body{background:var(--bg);color:var(--holo);font-family:"Consolas","Courier New",monospace;min-height:100vh}
+body::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(79,195,247,.03) 2px 4px);pointer-events:none;z-index:99}
+.wrap{max-width:900px;margin:0 auto;padding:16px}
+h1{text-align:center;font-size:clamp(15px,4vw,26px);letter-spacing:4px;text-shadow:0 0 12px var(--holo);padding:18px 0 4px}
+.sub{text-align:center;color:var(--dim);font-size:12px;margin-bottom:18px}
+.panel{background:var(--panel);border:1px solid var(--dim);border-radius:6px;padding:16px;margin-bottom:14px;box-shadow:0 0 18px rgba(79,195,247,.12) inset}
+input,textarea,select{width:100%;background:#03101f;border:1px solid var(--dim);color:var(--holo2);font-family:inherit;font-size:15px;padding:10px;border-radius:4px;margin:6px 0}
+input:focus,textarea:focus{outline:none;border-color:var(--holo);box-shadow:0 0 8px rgba(79,195,247,.4)}
+textarea{min-height:140px;resize:vertical}
+button{background:transparent;border:1px solid var(--holo);color:var(--holo);font-family:inherit;font-size:14px;padding:10px 14px;border-radius:4px;cursor:pointer;margin:4px 4px 4px 0;text-shadow:0 0 6px rgba(79,195,247,.6)}
+button:hover{background:rgba(79,195,247,.15);box-shadow:0 0 12px rgba(79,195,247,.5)}
+button.danger{border-color:var(--err);color:var(--err)}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
+.msg{padding:10px;border-radius:4px;margin:8px 0;font-size:14px;display:none}
+.msg.ok{display:block;color:var(--ok);border:1px solid var(--ok)}
+.msg.err{display:block;color:var(--err);border:1px solid var(--err)}
+.rec{border:1px solid var(--dim);border-left:3px solid var(--holo);padding:10px;margin:8px 0;border-radius:4px;cursor:pointer}
+.rec:hover{background:rgba(79,195,247,.08)}
+.code{color:var(--warn)}.locked{color:var(--dim)}
+.meta{color:var(--dim);font-size:12px;margin:4px 0}
+.body-text{white-space:pre-wrap;color:var(--holo2);line-height:1.5;padding:10px 0}
+.tag{display:inline-block;border:1px solid var(--dim);border-radius:10px;padding:1px 8px;font-size:11px;margin:2px;color:var(--holo2)}
+.hidden{display:none!important}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--holo2);margin-bottom:10px}
+.fileitem{font-size:13px;color:var(--warn);padding:4px 0}
+.journal-line{font-size:12px;color:var(--dim);padding:2px 0;border-bottom:1px dashed #0a2236}
+.glow{animation:pulse 2.5s infinite}
+@keyframes pulse{0%,100%{text-shadow:0 0 8px var(--holo)}50%{text-shadow:0 0 22px var(--holo)}}
+label{font-size:12px;color:var(--dim)}
+</style>
+</head>
+<body>
+<div class="wrap">
+<h1 class="glow">⟡ К О Д Е К С ⟡</h1>
+<div class="sub">АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ · «Знание — свет. Свет — Сила.»</div>
+
+<div id="authScreen" class="panel">
+  <div id="setupBlock" class="hidden">
+    <p style="color:var(--warn)">═══ ПЕРВОЕ ПРОБУЖДЕНИЕ АРХИВА ═══</p>
+    <p class="meta">Совет не найден. Создай учётную запись Магистра (допуск 5).</p>
+    <input id="setupName" placeholder="Имя Магистра" autocomplete="off">
+    <input id="setupPass" type="password" placeholder="Ключ доступа (пароль, мин. 8 знаков)">
+    <input id="setupPass2" type="password" placeholder="Повторите ключ">
+    <button onclick="setup()">СОЗДАТЬ МАГИСТРА</button>
+  </div>
+  <div id="loginBlock" class="hidden">
+    <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
+    <input id="loginName" placeholder="Имя оператора" autocomplete="off">
+    <input id="loginPass" type="password" placeholder="Ключ доступа" onkeydown="if(event.key==='Enter')login()">
+    <button onclick="login()">ВОЙТИ В АРХИВ</button>
+  </div>
+  <div id="authMsg" class="msg"></div>
+</div>
+
+<div id="mainScreen" class="hidden">
+  <div class="topbar">
+    <span>Приветствую, оператор <b id="uName"></b> · <span id="uRole"></span> · допуск <span id="uClear"></span></span>
+    <span><button onclick="logout()">ВЫХОД</button></span>
+  </div>
+  <div class="panel">
+    <input id="searchBox" placeholder="🔍 Фильтр списка: название, тег, код…" oninput="renderList()">
+    <div class="row">
+      <button onclick="openEditor()">＋ НОВАЯ ЗАПИСЬ</button>
+      <button onclick="showTab('list')">АРХИВ</button>
+      <button onclick="showTab('cats')">КАТЕГОРИИ</button>
+      <button onclick="showTab('journal')">ЖУРНАЛ</button>
+      <button id="councilBtn" onclick="showTab('council')">СОВЕТ</button>
+      <button id="backupBtn" onclick="backup()">РЕЗЕРВНАЯ КОПИЯ</button>
+    </div>
+  </div>
+
+  <div id="tab-list" class="panel"><div id="recList"></div></div>
+
+  <div id="tab-view" class="panel hidden">
+    <button onclick="showTab('list')">← НАЗАД</button>
+    <div id="viewContent"></div>
+  </div>
+
+  <div id="tab-editor" class="panel hidden">
+    <p id="editorTitle">─── НОВАЯ ЗАПИСЬ ───</p>
+    <input id="edTitle" placeholder="Название записи">
+    <div class="row">
+      <select id="edCat"></select>
+      <select id="edClear">
+        <option value="1">Допуск 1 — Падаван</option><option value="2">Допуск 2 — Рыцарь</option>
+        <option value="3" selected>Допуск 3 — Мастер</option><option value="4">Допуск 4 — Совет</option>
+        <option value="5">Допуск 5 — Магистр</option>
+      </select>
+    </div>
+    <input id="edTags" placeholder="Теги через запятую">
+    <input id="edSource" placeholder="Источник / ссылка">
+    <textarea id="edBody" placeholder="Текст досье…"></textarea>
+    <label>Прикрепить файлы (до 4 МБ каждый):</label>
+    <input type="file" id="edFiles" multiple>
+    <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
+    <button onclick="showTab('list')">ОТМЕНА</button>
+    <div id="edMsg" class="msg"></div>
+  </div>
+
+  <div id="tab-cats" class="panel hidden">
+    <p>─── КАТЕГОРИИ ───</p><div id="catList"></div>
+    <div class="row"><input id="newCatName" placeholder="Новая категория"><input id="newCatPrefix" placeholder="Префикс (3 буквы)" maxlength="3"></div>
+    <button onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
+    <div id="catMsg" class="msg"></div>
+  </div>
+
+  <div id="tab-journal" class="panel hidden"><p>─── ЖУРНАЛ ДОСТУПА ───</p><div id="journalList"></div></div>
+
+  <div id="tab-council" class="panel hidden">
+    <p>─── СОВЕТ: ОПЕРАТОРЫ ───</p><div id="userList"></div>
+    <p class="meta">Новый оператор:</p>
+    <input id="nuName" placeholder="Имя">
+    <input id="nuPass" type="password" placeholder="Ключ доступа (мин. 8 знаков)">
+    <div class="row">
+      <select id="nuRole"><option>ПАДАВАН</option><option selected>РЫЦАРЬ</option><option>МАСТЕР</option><option>МАГИСТР</option></select>
+      <select id="nuClear"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
+    </div>
+    <button onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
+    <div id="councilMsg" class="msg"></div>
+  </div>
+</div>
+<div class="sub">AES-256-GCM · ключ Голокрона · Cloudflare Workers + D1</div>
+</div>
+
+<script>
+"use strict";
+let TOKEN=sessionStorage.getItem("jedi_token")||null;
+let ME=JSON.parse(sessionStorage.getItem("jedi_me")||"null");
+let RECORDS=[], CATS=[], editingId=null;
+
+async function api(path, method, body){
+  const opt={method:method||"GET", headers:{}};
+  if(TOKEN)opt.headers["x-token"]=TOKEN;
+  if(body!==undefined){ opt.headers["Content-Type"]="application/json"; opt.body=JSON.stringify(body); }
+  const r=await fetch("/api"+path,opt);
+  const data=await r.json().catch(()=>({}));
+  if(!r.ok){ if(r.status===401 && ME){ alert("Сеанс истёк. Войдите заново."); doLogoutUI(); } throw new Error(data.error||"Ошибка связи с Архивом"); }
+  return data;
+}
+function msg(id,text,ok){ const el=document.getElementById(id); el.textContent=text; el.className="msg "+(ok?"ok":"err"); setTimeout(()=>el.className="msg",5000); }
+function esc(s){ const d=document.createElement("div"); d.textContent=s==null?"":String(s); return d.innerHTML; }
+
+async function setup(){
+  const n=document.getElementById("setupName").value.trim()||"Магистр";
+  const p=document.getElementById("setupPass").value, p2=document.getElementById("setupPass2").value;
+  if(!p||p!==p2||p.length<8){ msg("authMsg","Ключи пусты, не совпадают или короче 8 знаков.",false); return; }
+  try{ await api("/setup","POST",{name:n,password:p});
+    msg("authMsg","Магистр внесён в Совет. Ключ Голокрона создан. Теперь войдите.",true);
+    document.getElementById("setupBlock").classList.add("hidden");
+    document.getElementById("loginBlock").classList.remove("hidden");
+  }catch(e){ msg("authMsg",e.message,false); }
+}
+async function login(){
+  try{
+    const d=await api("/login","POST",{name:document.getElementById("loginName").value.trim(),password:document.getElementById("loginPass").value});
+    TOKEN=d.token; ME=d;
+    sessionStorage.setItem("jedi_token",TOKEN); sessionStorage.setItem("jedi_me",JSON.stringify(ME));
+    enterMain();
+  }catch(e){ msg("authMsg",e.message,false); }
+}
+async function logout(){ try{ await api("/logout","POST",{}); }catch(e){} doLogoutUI(); }
+function doLogoutUI(){
+  TOKEN=null; ME=null; sessionStorage.clear();
+  document.getElementById("mainScreen").classList.add("hidden");
+  document.getElementById("authScreen").classList.remove("hidden");
+  document.getElementById("loginBlock").classList.remove("hidden");
+  document.getElementById("loginPass").value="";
+}
+async function enterMain(){
+  document.getElementById("authScreen").classList.add("hidden");
+  document.getElementById("mainScreen").classList.remove("hidden");
+  document.getElementById("uName").textContent=ME.name;
+  document.getElementById("uRole").textContent=ME.role;
+  document.getElementById("uClear").textContent=ME.clearance;
+  document.getElementById("councilBtn").style.display=ME.clearance>=5?"":"none";
+  document.getElementById("backupBtn").style.display=ME.clearance>=5?"":"none";
+  CATS=await api("/categories"); fillCatSelect(); showTab("list");
+}
+
+const TABS=["list","view","editor","cats","journal","council"];
+function showTab(t){
+  TABS.forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));
+  if(t==="list")loadRecords(); if(t==="cats")renderCats();
+  if(t==="journal")renderJournal(); if(t==="council")renderCouncil();
+}
+
+async function loadRecords(){ RECORDS=await api("/records"); renderList(); }
+function renderList(){
+  const q=(document.getElementById("searchBox").value||"").toLowerCase();
+  const box=document.getElementById("recList"); box.innerHTML="";
+  let shown=0;
+  for(const r of RECORDS){
+    if(r.locked){
+      if(q)continue;
+      const div=document.createElement("div"); div.className="rec";
+      div.innerHTML='<span class="locked">▓▓▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — допуск '+r.clearance+']</span>';
+      box.appendChild(div); shown++; continue;
+    }
+    if(q && !((r.title||"")+(r.tags||"")+r.code+(r.category||"")+(r.source||"")).toLowerCase().includes(q))continue;
+    const div=document.createElement("div"); div.className="rec";
+    div.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · '+esc(r.updated)+'</div>';
+    div.onclick=()=>viewRecord(r.id);
+    box.appendChild(div); shown++;
+  }
+  if(!shown)box.innerHTML='<p class="meta">Архив молчит… записей не найдено.</p>';
+}
+
+async function viewRecord(id){
+  let r; try{ r=await api("/records/"+id); }catch(e){ alert(e.message); return; }
+  let filesHtml="";
+  (r.files||[]).forEach(f=>{
+    filesHtml+='<div class="fileitem">📎 '+esc(f.filename)+' ('+f.size+' б) <button onclick="downloadFile('+f.id+',\''+esc(f.filename)+'\')">СКАЧАТЬ</button> <button onclick="checkFile('+f.id+')">ПРОВЕРИТЬ ЦЕЛОСТНОСТЬ</button></div>';
+  });
+  document.getElementById("viewContent").innerHTML=
+    '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
+    '<div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · автор: '+esc(r.author)+' · создано: '+esc(r.created)+' · изменено: '+esc(r.updated)+'</div>'+
+    '<div>'+(r.tags||"").split(",").filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join("")+'</div>'+
+    (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':"")+
+    '<div class="body-text">'+esc(r.body)+'</div>'+filesHtml+
+    '<div style="margin-top:10px"><button onclick="openEditor('+r.id+')">✎ РЕДАКТИРОВАТЬ</button>'+
+    (ME.clearance>=4?'<button class="danger" onclick="deleteRecord('+r.id+',\''+esc(r.code)+'\')">✖ УДАЛИТЬ</button>':"")+'</div>';
+  showTab("view");
+}
+async function downloadFile(fid,name){
+  const r=await fetch("/api/files/"+fid,{headers:{"x-token":TOKEN}});
+  if(!r.ok){ alert("Недостаточный допуск или файл не найден."); return; }
+  const blob=await r.blob();
+  const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; a.click();
+}
+async function checkFile(fid){
+  try{ const d=await api("/files/"+fid+"/check");
+    alert(d.ok?("✓ Целостность подтверждена. SHA-256: "+d.sha256.slice(0,16)+"…"):"✖ ЦЕЛОСТНОСТЬ НАРУШЕНА! Файл был изменён.");
+  }catch(e){ alert(e.message); }
+}
+async function deleteRecord(id,code){
+  if(!confirm("Удалить "+code+" навсегда?"))return;
+  try{ await api("/records/"+id,"DELETE"); showTab("list"); }catch(e){ alert(e.message); }
+}
+
+function fillCatSelect(){
+  const s=document.getElementById("edCat"); s.innerHTML="";
+  CATS.forEach(c=>{ const o=document.createElement("option"); o.value=c.name; o.textContent=c.name; s.appendChild(o); });
+}
+async function openEditor(id){
+  editingId=id||null;
+  let r=null;
+  if(id){ try{ r=await api("/records/"+id); }catch(e){ alert(e.message); return; } }
+  document.getElementById("editorTitle").textContent=r?"─── РЕДАКТИРОВАНИЕ "+r.code+" ───":"─── НОВАЯ ЗАПИСЬ ───";
+  document.getElementById("edTitle").value=r?r.title:"";
+  document.getElementById("edCat").value=r?r.category:"ДОСЬЕ";
+  document.getElementById("edClear").value=r?r.clearance:Math.min(3,ME.clearance);
+  document.getElementById("edTags").value=r?r.tags:"";
+  document.getElementById("edSource").value=r?r.source:"";
+  document.getElementById("edBody").value=r?r.body:"";
+  document.getElementById("edFiles").value="";
+  showTab("editor");
+}
+async function saveRecord(){
+  const payload={
+    title:document.getElementById("edTitle").value.trim(),
+    category:document.getElementById("edCat").value,
+    clearance:parseInt(document.getElementById("edClear").value),
+    tags:document.getElementById("edTags").value.trim(),
+    source:document.getElementById("edSource").value.trim(),
+    body:document.getElementById("edBody").value
+  };
+  if(!payload.title){ msg("edMsg","Пустое название — Архив не принимает.",false); return; }
+  try{
+    let id=editingId, code;
+    if(editingId){ await api("/records/"+editingId,"PUT",payload); }
+    else{ const d=await api("/records","POST",payload); id=d.id; code=d.code; }
+    const fi=document.getElementById("edFiles");
+    if(fi.files.length){
+      const fd=new FormData();
+      for(const f of fi.files)fd.append("files",f);
+      const r=await fetch("/api/records/"+id+"/files",{method:"POST",headers:{"x-token":TOKEN},body:fd});
+      if(!r.ok){ const e=await r.json(); throw new Error(e.error||"Ошибка загрузки файлов"); }
+    }
+    msg("edMsg","✓ Запись "+(code||"")+" сохранена.",true);
+    setTimeout(()=>viewRecord(id),500);
+  }catch(e){ msg("edMsg",e.message,false); }
+}
+
+async function renderCats(){
+  CATS=await api("/categories");
+  document.getElementById("catList").innerHTML=CATS.map(c=>'<div class="rec"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join("");
+}
+async function addCategory(){
+  try{
+    await api("/categories","POST",{name:document.getElementById("newCatName").value,prefix:document.getElementById("newCatPrefix").value});
+    msg("catMsg","✓ Категория добавлена.",true); CATS=await api("/categories"); fillCatSelect(); renderCats();
+  }catch(e){ msg("catMsg",e.message,false); }
+}
+async function renderJournal(){
+  const box=document.getElementById("journalList");
+  try{
+    const j=await api("/journal");
+    box.innerHTML=j.map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join("");
+  }catch(e){ box.innerHTML='<p style="color:var(--err)">✖ '+esc(e.message)+'</p>'; }
+}
+async function renderCouncil(){
+  if(ME.clearance<5)return;
+  const users=await api("/users");
+  const box=document.getElementById("userList"); box.innerHTML="";
+  users.forEach(u=>{
+    const div=document.createElement("div"); div.className="rec";
+    div.innerHTML=esc(u.name)+' │ '+esc(u.role)+' │ допуск '+u.clearance+' ';
+    const sel=document.createElement("select"); sel.style.width="70px";
+    [1,2,3,4,5].forEach(n=>{ const o=document.createElement("option"); o.value=n; o.textContent=n; if(n===u.clearance)o.selected=true; sel.appendChild(o); });
+    sel.onchange=async()=>{ try{ await api("/users/"+encodeURIComponent(u.name),"PUT",{clearance:sel.value}); }catch(e){ alert(e.message); } };
+    div.appendChild(sel); box.appendChild(div);
+  });
+}
+async function addUser(){
+  try{
+    await api("/users","POST",{name:document.getElementById("nuName").value.trim(),password:document.getElementById("nuPass").value,
+      role:document.getElementById("nuRole").value,clearance:document.getElementById("nuClear").value});
+    msg("councilMsg","✓ Оператор добавлен, ключ Голокрона выдан.",true); renderCouncil();
+  }catch(e){ msg("councilMsg",e.message,false); }
+}
+async function backup(){
+  try{
+    const data=await api("/backup");
+    const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
+    const a=document.createElement("a"); a.href=URL.createObjectURL(blob);
+    a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json"; a.click();
+  }catch(e){ alert(e.message); }
+}
+
+(async()=>{
+  try{
+    const st=await fetch("/api/status").then(r=>r.json());
+    if(!st.initialized)document.getElementById("setupBlock").classList.remove("hidden");
+    else if(TOKEN&&ME){ try{ CATS=await api("/categories"); enterMain(); }catch(e){ doLogoutUI(); } }
+    else document.getElementById("loginBlock").classList.remove("hidden");
+  }catch(e){ msg("authMsg","Храм недоступен. Проверь, что Worker задеплоен.",false); }
+})();
+</script>
+</body>
+</html>
