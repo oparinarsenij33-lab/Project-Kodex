@@ -9,7 +9,7 @@ binding = "ASSETS"
 [[d1_databases]]
 binding = "DB"
 database_name = "archive-db"
-database_id = "ВСТАВЬ_ID_ИЗ_ПАНЕЛИ"
+database_id = "5bdc887a-4ce4-453f-8dc3-e600c64081a7"
 
 [[r2_buckets]]
 binding = "VAULT"
