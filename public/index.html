@@ -7,7 +7,7 @@
 <style>
 :root{--bg:#020610;--panel:#061224;--holo:#4fc3f7;--holo2:#81d4fa;--dim:#1b4a6b;--warn:#ffb74d;--err:#ef5350;--ok:#69f0ae}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--holo);font-family:"Consolas","Courier New",monospace;min-height:100vh}
+body{background:var(--bg);color:var(--holo);font-family:"Consolas","Courier New",monospace;min-height:100vh;padding-bottom:150px}
 body::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(79,195,247,.03) 2px 4px);pointer-events:none;z-index:99}
 .wrap{max-width:900px;margin:0 auto;padding:16px}
 h1{text-align:center;font-size:clamp(15px,4vw,26px);letter-spacing:4px;text-shadow:0 0 12px var(--holo);padding:18px 0 4px}
@@ -37,7 +37,8 @@ button.danger{border-color:var(--err);color:var(--err)}
 .glow{animation:pulse 2.5s infinite}
 @keyframes pulse{0%,100%{text-shadow:0 0 8px var(--holo)}50%{text-shadow:0 0 22px var(--holo)}}
 label{font-size:12px;color:var(--dim)}
-#diag{font-size:11px;color:var(--dim);max-height:120px;overflow:auto;border:1px dashed #0a2236;padding:6px;margin-top:8px;display:none}
+#diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:130px;overflow:auto;background:#03101f;border:1px solid var(--dim);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--dim);z-index:100}
+#diag b{color:var(--holo2)}
 </style>
 </head>
 <body>
@@ -61,7 +62,6 @@ label{font-size:12px;color:var(--dim)}
     <button onclick="login()">ВОЙТИ В АРХИВ</button>
   </div>
   <div id="authMsg" class="msg"></div>
-  <div id="diag"></div>
 </div>
 
 <div id="mainScreen" class="hidden">
@@ -81,7 +81,7 @@ label{font-size:12px;color:var(--dim)}
     </div>
   </div>
 
-  <div id="tab-list" class="panel"><div id="recList"></div></div>
+  <div id="tab-list" class="panel"><div id="listMsg" class="msg"></div><div id="recList"></div></div>
 
   <div id="tab-view" class="panel hidden">
     <button onclick="showTab('list')">← НАЗАД</button>
@@ -110,16 +110,15 @@ label{font-size:12px;color:var(--dim)}
   </div>
 
   <div id="tab-cats" class="panel hidden">
-    <p>─── КАТЕГОРИИ ───</p><div id="catList"></div>
+    <p>─── КАТЕГОРИИ ───</p><div id="catMsg" class="msg"></div><div id="catList"></div>
     <div class="row"><input id="newCatName" placeholder="Новая категория"><input id="newCatPrefix" placeholder="Префикс (3 буквы)" maxlength="3"></div>
     <button onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
-    <div id="catMsg" class="msg"></div>
   </div>
 
   <div id="tab-journal" class="panel hidden"><p>─── ЖУРНАЛ ДОСТУПА ───</p><div id="journalList"></div></div>
 
   <div id="tab-council" class="panel hidden">
-    <p>─── СОВЕТ: ОПЕРАТОРЫ ───</p><div id="userList"></div>
+    <p>─── СОВЕТ: ОПЕРАТОРЫ ───</p><div id="councilMsg" class="msg"></div><div id="userList"></div>
     <p class="meta">Новый оператор:</p>
     <input id="nuName" placeholder="Имя">
     <input id="nuPass" type="password" placeholder="Ключ доступа (мин. 8 знаков)">
@@ -128,11 +127,11 @@ label{font-size:12px;color:var(--dim)}
       <select id="nuClear"><option value="1">1</option><option value="2" selected>2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option></select>
     </div>
     <button onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
-    <div id="councilMsg" class="msg"></div>
   </div>
 </div>
 <div class="sub">AES-256-GCM · ключ Голокрона у Ордена · Cloudflare Workers + D1</div>
 </div>
+<div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b> (сюда пишутся все шаги и ошибки)</div>
 
 <script>
 "use strict";
@@ -143,13 +142,23 @@ const te=new TextEncoder(), td=new TextDecoder();
 function b64(buf){const a=new Uint8Array(buf);let s="";for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(s);}
 function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
 function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
-function msg(id,t,ok){const el=document.getElementById(id);el.textContent=t;el.className="msg "+(ok?"ok":"err");setTimeout(()=>el.className="msg",8000);}
-function D(t){const el=document.getElementById("diag");if(!el)return;el.style.display="block";const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+" › "+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log("[КОДЕКС]",t);}
-function busy(on){document.querySelectorAll("#authScreen button, #mainScreen button").forEach(b=>b.disabled=on);}
-function withTimeout(promise,ms,label){
-  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+" — таймаут "+ms+"мс (Worker не ответил). Проверь деплой и bindings.")),ms))]);
-}
+function msg(id,t,ok){const el=document.getElementById(id);if(!el)return;el.textContent=t;el.className="msg "+(ok?"ok":"err");}
+function D(t){const el=document.getElementById("diag");const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+" › "+t;el.appendChild(d);while(el.children.length>60)el.removeChild(el.children[1]);el.scrollTop=el.scrollHeight;console.log("[КОДЕКС]",t);}
+window.addEventListener("error",e=>D("ОШИБКА СТРАНИЦЫ: "+e.message));
+window.addEventListener("unhandledrejection",e=>D("ОТКЛОНЁННЫЙ PROMISE: "+(e.reason&&e.reason.message||e.reason)));
 
+/* блокировка кнопок ТОЛЬКО для изменяющих операций + страховка от залипания */
+let lockCount=0, lastLock=0;
+function busy(on){
+  lockCount=Math.max(0,lockCount+(on?1:-1));lastLock=Date.now();
+  const dis=lockCount>0;
+  document.querySelectorAll("#mainScreen button, #authScreen button").forEach(b=>b.disabled=dis);
+}
+setInterval(()=>{ if(lockCount>0&&Date.now()-lastLock>25000){lockCount=0;busy(false);D("страховка: кнопки разблокированы принудительно");} },5000);
+
+function withTimeout(promise,ms,label){
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+": Worker не ответил за "+ms+"мс"))),ms))]);
+}
 async function derive(pass,salt){
   const km=await crypto.subtle.importKey("raw",te.encode(pass),"PBKDF2",false,["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:unb64(salt),iterations:250000,hash:"SHA-256"},km,256));
@@ -171,16 +180,18 @@ async function api(path,method,body){
   const opt={method:method||"GET",headers:{}};
   if(TOKEN)opt.headers["x-token"]=TOKEN;
   if(body!==undefined){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body);}
-  const r=await withTimeout(fetch("/api"+path,opt),20000,"запрос "+path);
+  const r=await withTimeout(fetch("/api"+path,opt),15000,"запрос "+path);
   let data;
-  try{data=await r.json();}catch(e){throw new Error("Worker вернул не-JSON (возможно, старая версия или ошибка 1102). Статус: "+r.status);}
-  if(!r.ok){if(r.status===401&&ME){alert("Сеанс истёк. Войдите заново.");doLogoutUI();}throw new Error(data.error||("Ошибка связи: "+r.status));}
+  try{data=await r.json();}catch(e){throw new Error("Worker вернул не-JSON (старая версия деплоя или сбой 1102). Статус: "+r.status);}
+  if(!r.ok){if(r.status===401&&ME){doLogoutUI();throw new Error("Сеанс истёк. Войдите заново.");}throw new Error(data.error||("Ошибка связи: "+r.status));}
   return data;
 }
-async function guard(fn,errTarget){
-  try{busy(true);D("начало операции…");await fn();D("готово ✓");}
+/* guard: lock=true только для изменяющих операций; ошибки пишем в msg-панель и в diag */
+async function guard(fn,errTarget,lock){
+  if(lock)busy(true);
+  try{await fn();}
   catch(e){D("ОШИБКА: "+e.message);if(errTarget)msg(errTarget,e.message,false);else alert(e.message);}
-  finally{busy(false);}
+  finally{if(lock)busy(false);}
 }
 
 async function setup(){await guard(async()=>{
@@ -194,32 +205,31 @@ async function setup(){await guard(async()=>{
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
   document.getElementById("setupBlock").classList.add("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
-  msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона и передавай только членам Ордена.",true);
+  msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона.",true);
   prompt("ССЫЛКА-КЛЮЧ ГОЛОКРОНА — сохрани её! Без неё записи не прочитать:",link);
-},"authMsg");}
+},"authMsg",true);}
 
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
   if(!nm)throw new Error("Введи имя оператора.");
-  D("запрос соли для "+nm+"…");
-  const st=await withTimeout(fetch("/api/salt?name="+encodeURIComponent(nm)),20000,"получение соли").then(r=>r.json()).catch(e=>{throw new Error("Не удалось получить соль: "+e.message);});
-  if(!st.salt)throw new Error("Оператор «"+nm+"» не найден в Архиве.");
-  D("соль получена, деривация пароля (250k, ~1-3 сек)…");
-  const t0=performance.now();const v=await makeVerifier(p,st.salt);D("хеш готов за "+Math.round(performance.now()-t0)+"мс");
+  D("запрос соли…");
+  const st=await withTimeout(fetch("/api/salt?name="+encodeURIComponent(nm)),15000,"получение соли").then(r=>r.json());
+  if(!st.salt)throw new Error("Оператор «"+nm+"» не найден.");
+  D("деривация пароля (~1-3 сек)…");const v=await makeVerifier(p,st.salt);
   const hash=location.hash;
-  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Открой Архив по полной ссылке-приглашению …#k=… от Магистра (не просто project-kodex).");
-  D("проверка доступа на сервере…");
+  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Нужна полная ссылка …#k=… от Магистра.");
   const d=await api("/login","POST",{name:nm,verifier:v});
   let ks=hash.slice(3).replace(/-/g,"+").replace(/_/g,"/");while(ks.length%4)ks+="=";
-  D("импорт ключа Голокрона…");VAULT=await importVault(unb64(ks));
+  VAULT=await importVault(unb64(ks));
   TOKEN=d.token;ME=d;
   sessionStorage.setItem("jedi_token",TOKEN);sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
+  D("вход выполнен");
   await enterMain();
-},"authMsg");}
+},"authMsg",true);}
 
 async function logout(){try{await api("/logout","POST",{});}catch(e){}doLogoutUI();}
 function doLogoutUI(){
-  TOKEN=null;ME=null;VAULT=null;sessionStorage.clear();
+  TOKEN=null;ME=null;VAULT=null;sessionStorage.clear();lockCount=0;busy(false);
   document.getElementById("mainScreen").classList.add("hidden");
   document.getElementById("authScreen").classList.remove("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
@@ -239,11 +249,18 @@ const TABS=["list","view","editor","cats","journal","council"];
 function showTabRaw(t){TABS.forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));}
 function showTab(t){
   showTabRaw(t);
-  if(t==="list")guard(loadRecords);if(t==="cats")guard(renderCats);
-  if(t==="journal")guard(renderJournal);if(t==="council")guard(renderCouncil);
+  /* навигация НЕ блокирует кнопки */
+  if(t==="list")guard(loadRecords,"listMsg",false);
+  if(t==="cats")guard(renderCats,"catMsg",false);
+  if(t==="journal")guard(renderJournal,null,false);
+  if(t==="council")guard(renderCouncil,"councilMsg",false);
 }
-async function loadRecords(){RECORDS=await api("/records");renderList();}
+async function loadRecords(){
+  D("загрузка списка записей…");
+  RECORDS=await api("/records");renderList();D("список загружен: "+RECORDS.length);
+}
 function renderList(){
+  msg("listMsg","",true);document.getElementById("listMsg").className="msg";
   const q=(document.getElementById("searchBox").value||"").toLowerCase();
   const box=document.getElementById("recList");box.innerHTML="";let shown=0;
   for(const r of RECORDS){
@@ -280,20 +297,20 @@ async function viewRecord(id){await guard(async()=>{
     d.appendChild(b1);d.appendChild(b2);fb.appendChild(d);
   });
   showTabRaw("view");
-});}
+},null,false);}
 async function downloadFile(fid,name){await guard(async()=>{
   const r=await withTimeout(fetch("/api/files/"+fid,{headers:{"x-token":TOKEN}}),30000,"скачивание");
   if(!r.ok)throw new Error("Недостаточный допуск или файл не найден.");
   const blob=await r.blob();
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();
-});}
+},null,true);}
 async function checkFile(fid){await guard(async()=>{
   const d=await api("/files/"+fid+"/check");
   alert(d.ok?("✓ Целостность подтверждена. SHA-256: "+d.sha256.slice(0,16)+"…"):"✖ ЦЕЛОСТНОСТЬ НАРУШЕНА!");
-});}
+},null,true);}
 async function deleteRecord(id,code){
   if(!confirm("Удалить "+code+" навсегда?"))return;
-  await guard(async()=>{await api("/records/"+id,"DELETE");showTab("list");});
+  await guard(async()=>{await api("/records/"+id,"DELETE");showTab("list");},null,true);
 }
 function fillCatSelect(){
   const s=document.getElementById("edCat");s.innerHTML="";
@@ -311,11 +328,11 @@ async function openEditor(id){await guard(async()=>{
   document.getElementById("edBody").value=r?await decText(r.body_enc):"";
   document.getElementById("edFiles").value="";
   showTabRaw("editor");
-},"edMsg");}
+},"edMsg",false);}
 async function saveRecord(){await guard(async()=>{
   const title=document.getElementById("edTitle").value.trim();
   if(!title)throw new Error("Пустое название — Архив не принимает.");
-  D("шифрование тела записи…");
+  D("шифрование и сохранение записи…");
   const payload={title,
     category:document.getElementById("edCat").value,
     clearance:parseInt(document.getElementById("edClear").value),
@@ -331,9 +348,9 @@ async function saveRecord(){await guard(async()=>{
     const r=await withTimeout(fetch("/api/records/"+id+"/files",{method:"POST",headers:{"x-token":TOKEN},body:fd}),30000,"загрузка файлов");
     if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||"Ошибка загрузки файлов");}
   }
-  msg("edMsg","✓ Запись "+(code||"")+" сохранена.",true);
+  msg("edMsg","✓ Запись "+(code||"")+" сохранена.",true);D("запись сохранена");
   setTimeout(()=>viewRecord(id),400);
-},"edMsg");}
+},"edMsg",true);}
 async function renderCats(){
   CATS=await api("/categories");
   document.getElementById("catList").innerHTML=CATS.map(c=>'<div class="rec"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join("");
@@ -341,12 +358,13 @@ async function renderCats(){
 async function addCategory(){await guard(async()=>{
   await api("/categories","POST",{name:document.getElementById("newCatName").value,prefix:document.getElementById("newCatPrefix").value});
   msg("catMsg","✓ Категория добавлена.",true);CATS=await api("/categories");fillCatSelect();renderCats();
-},"catMsg");}
+},"catMsg",true);}
 async function renderJournal(){
   const box=document.getElementById("journalList");
+  box.innerHTML='<p class="meta">Запрашиваю журнал…</p>';
   try{const j=await api("/journal");
-    box.innerHTML=j.map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join("");
-  }catch(e){box.innerHTML='<p style="color:var(--err)">✖ '+esc(e.message)+'</p>';}
+    box.innerHTML=j.length?j.map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join(""):'<p class="meta">Журнал пуст.</p>';
+  }catch(e){box.innerHTML='<p style="color:var(--err)">✖ '+esc(e.message)+'</p>';D("журнал: "+e.message);}
 }
 async function renderCouncil(){
   if(ME.clearance<5)return;
@@ -357,7 +375,7 @@ async function renderCouncil(){
     div.innerHTML=esc(u.name)+' │ '+esc(u.role)+' │ допуск '+u.clearance+' ';
     const sel=document.createElement("select");sel.style.width="70px";
     [1,2,3,4,5].forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;if(n===u.clearance)o.selected=true;sel.appendChild(o);});
-    sel.onchange=()=>guard(async()=>{await api("/users/"+encodeURIComponent(u.name),"PUT",{clearance:sel.value});},"councilMsg");
+    sel.onchange=()=>guard(async()=>{await api("/users/"+encodeURIComponent(u.name),"PUT",{clearance:sel.value});},"councilMsg",true);
     div.appendChild(sel);box.appendChild(div);
   });
 }
@@ -368,23 +386,23 @@ async function addUser(){await guard(async()=>{
   await api("/users","POST",{name:n,salt,verifier:await makeVerifier(p,salt),
     role:document.getElementById("nuRole").value,clearance:document.getElementById("nuClear").value});
   msg("councilMsg","✓ Оператор добавлен. Передай ему ссылку-ключ Голокрона и его имя/пароль.",true);renderCouncil();
-},"councilMsg");}
+},"councilMsg",true);}
 async function backup(){await guard(async()=>{
   const data=await api("/backup");
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json";a.click();
-});}
+},null,true);}
 (async()=>{
   D("инициализация КОДЕКСА…");
   try{
     const st=await withTimeout(fetch("/api/status"),15000,"проверка статуса").then(r=>r.json());
-    D("статус получен, initialized="+st.initialized);
+    D("статус: initialized="+st.initialized);
     if(!st.initialized){document.getElementById("setupBlock").classList.remove("hidden");return;}
     const ks=sessionStorage.getItem("jedi_key");
-    if(TOKEN&&ME&&ks){VAULT=await importVault(unb64(ks));try{CATS=await api("/categories");await enterMain();return;}catch(e){doLogoutUI();}}
+    if(TOKEN&&ME&&ks){VAULT=await importVault(unb64(ks));try{CATS=await api("/categories");await enterMain();return;}catch(e){D("автовход не удался: "+e.message);doLogoutUI();}}
     document.getElementById("loginBlock").classList.remove("hidden");
-    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка-ключ Голокрона от Магистра (вид …workers.dev/#k=…). Просто project-kodex не сработает.",false);
+    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка-ключ …#k=… от Магистра.",false);
   }catch(e){D("FAIL init: "+e.message);msg("authMsg","Храм недоступен: "+e.message,false);}
 })();
 </script>
