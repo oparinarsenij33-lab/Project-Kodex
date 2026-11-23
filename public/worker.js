@@ -1,11 +1,12 @@
 // ═══════════════════════════════════════════════════════════
-//  АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ — Cloudflare Worker + D1 + R2
-//  Биндинги: DB (D1), VAULT (R2), ASSETS (статика).
+//  АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ — Cloudflare Worker + D1 (без R2)
+//  Биндинги: DB (D1), ASSETS (статика). Файлы хранятся в D1.
 // ═══════════════════════════════════════════════════════════
 const ITER = 100000;
+const MAX_FILE = 4 * 1024 * 1024; // 4 МБ на файл (лимиты D1)
 
 const enc = new TextEncoder(), dec = new TextDecoder();
-const b64 = (buf) => btoa(String.fromCharCode(...new Uint8Array(buf)));
+const b64 = (buf) => { const a = new Uint8Array(buf); let s = ""; for (let i = 0; i < a.length; i += 8192) s += String.fromCharCode(...a.subarray(i, i + 8192)); return btoa(s); };
 const unb64 = (s) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
 const now = () => new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
@@ -155,7 +156,7 @@ export default {
         if (r.clearance > user.clearance) { await log(env, user.name, "ПОПЫТКА ДОСТУПА", r.code); return json({ error: "Недостаточный допуск." }, 403); }
         if (request.method === "GET") {
           await log(env, user.name, "ЧТЕНИЕ", r.code);
-          const files = await env.DB.prepare("SELECT id,filename,size,sha256,r2key FROM attachments WHERE record_id=?").bind(id).all();
+          const files = await env.DB.prepare("SELECT id,filename,size,sha256 FROM attachments WHERE record_id=?").bind(id).all();
           return json({ ...r, body: await decText(vaultKey, r.body_enc), body_enc: undefined, files: files.results });
         }
         if (request.method === "PUT") {
@@ -169,8 +170,6 @@ export default {
         }
         if (request.method === "DELETE") {
           if (user.clearance < Math.max(4, r.clearance)) return json({ error: "Удаление требует допуск 4+." }, 403);
-          const files = await env.DB.prepare("SELECT r2key FROM attachments WHERE record_id=?").bind(id).all();
-          for (const f of files.results) await env.VAULT.delete(f.r2key);
           await env.DB.prepare("DELETE FROM attachments WHERE record_id=?").bind(id).run();
           await env.DB.prepare("DELETE FROM records WHERE id=?").bind(id).run();
           await log(env, user.name, "УДАЛЕНИЕ", r.code);
@@ -178,6 +177,7 @@ export default {
         }
       }
 
+      // ---------- файлы: храним в D1 (base64) ----------
       const upMatch = p.match(/^\/api\/records\/(\d+)\/files$/);
       if (upMatch && request.method === "POST") {
         const id = parseInt(upMatch[1]);
@@ -188,12 +188,11 @@ export default {
         let count = 0;
         for (const f of form.getAll("files")) {
           if (typeof f === "string") continue;
+          if (f.size > MAX_FILE) return json({ error: "Файл " + f.name + " больше 4 МБ — хранилище D1 не вместит." }, 400);
           const buf = await f.arrayBuffer();
           const h = hex(await crypto.subtle.digest("SHA-256", buf));
-          const key = id + "/" + h.slice(0, 16) + "_" + f.name.replace(/[^\w.\-а-яА-ЯёЁ]/g, "_");
-          await env.VAULT.put(key, buf);
-          await env.DB.prepare("INSERT INTO attachments(record_id,filename,r2key,sha256,size) VALUES(?,?,?,?,?)")
-            .bind(id, f.name, key, h, buf.byteLength).run();
+          await env.DB.prepare("INSERT INTO attachments(record_id,filename,sha256,size,data) VALUES(?,?,?,?,?)")
+            .bind(id, f.name, h, buf.byteLength, b64(buf)).run();
           await log(env, user.name, "ВЛОЖЕНИЕ", r.code + ":" + f.name);
           count++;
         }
@@ -205,16 +204,15 @@ export default {
           .bind(parseInt(fileMatch[1])).first();
         if (!a) return json({ error: "Файл не найден." }, 404);
         if (a.clearance > user.clearance) return json({ error: "Недостаточный допуск." }, 403);
-        const obj = await env.VAULT.get(a.r2key);
-        if (!obj) return json({ error: "Файл отсутствует в хранилище!" }, 404);
+        const bytes = unb64(a.data);
         if (fileMatch[2]) {
-          const h = hex(await crypto.subtle.digest("SHA-256", await obj.arrayBuffer()));
+          const h = hex(await crypto.subtle.digest("SHA-256", bytes));
           const ok = h === a.sha256;
           await log(env, user.name, ok ? "ПРОВЕРКА ФАЙЛА OK" : "ЦЕЛОСТНОСТЬ НАРУШЕНА", a.filename);
           return json({ ok, sha256: a.sha256 });
         }
         await log(env, user.name, "СКАЧИВАНИЕ", a.code + ":" + a.filename);
-        return new Response(obj.body, { headers: {
+        return new Response(bytes, { headers: {
           "Content-Type": "application/octet-stream",
           "Content-Disposition": "attachment; filename*=UTF-8''" + encodeURIComponent(a.filename)
         }});
@@ -259,7 +257,7 @@ export default {
         const data = {
           records: (await env.DB.prepare("SELECT * FROM records").all()).results,
           categories: (await env.DB.prepare("SELECT * FROM categories").all()).results,
-          attachments: (await env.DB.prepare("SELECT * FROM attachments").all()).results,
+          attachments: (await env.DB.prepare("SELECT id,record_id,filename,sha256,size FROM attachments").all()).results,
           exported: now()
         };
         await log(env, user.name, "РЕЗЕРВНАЯ КОПИЯ");
