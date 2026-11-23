@@ -1,0 +1,16 @@
+name = "archive-ordena"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+
+[assets]
+directory = "./public"
+binding = "ASSETS"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "archive-db"
+database_id = "ВСТАВЬ_ID_ИЗ_ПАНЕЛИ"
+
+[[r2_buckets]]
+binding = "VAULT"
+bucket_name = "archive-vault"
