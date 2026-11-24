@@ -39,6 +39,7 @@ button.danger{border-color:var(--err);color:var(--err)}
 label{font-size:12px;color:var(--dim)}
 #diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:130px;overflow:auto;background:#03101f;border:1px solid var(--dim);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--dim);z-index:100}
 #diag b{color:var(--holo2)}
+.img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
 </style>
 </head>
 <body>
@@ -61,8 +62,6 @@ label{font-size:12px;color:var(--dim)}
     <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
     <input id="loginName" placeholder="Имя оператора" autocomplete="off">
     <input id="loginPass" type="password" placeholder="Ключ доступа" onkeydown="if(event.key==='Enter')login()">
-    <input id="loginToken" type="password" placeholder="GitHub Token">
-    <input id="loginRepo" placeholder="owner/repo">
     <button onclick="login()">ВОЙТИ В АРХИВ</button>
   </div>
   <div id="authMsg" class="msg"></div>
@@ -106,8 +105,9 @@ label{font-size:12px;color:var(--dim)}
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <textarea id="edBody" placeholder="Текст досье…"></textarea>
-    <label>Прикрепить файлы (до 4 МБ каждый):</label>
-    <input type="file" id="edFiles" multiple>
+    <label>Прикрепить фото (автосжатие до 800x600):</label>
+    <input type="file" id="edFiles" accept="image/*">
+    <img id="imgPreview" class="img-preview">
     <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
     <div id="edMsg" class="msg"></div>
@@ -142,8 +142,8 @@ label{font-size:12px;color:var(--dim)}
 <script>
 var _b=document.createElement("div");_b.textContent="BOOT OK — скрипт жив";document.getElementById("diag").appendChild(_b);
 "use strict";
-let GH_TOKEN=sessionStorage.getItem("gh_token")||null;
-let GH_REPO=sessionStorage.getItem("gh_repo")||null;
+let GH_TOKEN=sessionStorage.getItem("gh_token")||localStorage.getItem("gh_token")||null;
+let GH_REPO=sessionStorage.getItem("gh_repo")||localStorage.getItem("gh_repo")||null;
 let ME=JSON.parse(sessionStorage.getItem("jedi_me")||"null");
 let VAULT=null, RECORDS=[], CATS=[], USERS=[], JOURNAL=[], editingId=null;
 const te=new TextEncoder(), td=new TextDecoder();
@@ -207,6 +207,56 @@ async function ghList(dir){
   return await r.json();
 }
 
+/* ─── Postimages upload ─── */
+async function uploadToPostimages(file){
+  const fd=new FormData();
+  fd.append("image",file);
+  fd.append("type","file");
+  const r=await withTimeout(fetch("https://postimages.org/json/rr",{method:"POST",body:fd}),30000,"загрузка на Postimages");
+  if(!r.ok)throw new Error("Ошибка загрузки на Postimages: "+r.status);
+  const j=await r.json();
+  if(!j.url)throw new Error("Postimages не вернул ссылку");
+  return j.url; // прямая ссылка на изображение
+}
+
+/* ─── Image compression ─── */
+async function compressImage(file,maxW=800,maxH=600,quality=0.8){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const canvas=document.createElement("canvas");
+      let w=img.width,h=img.height;
+      if(w>maxW){h*=maxW/w;w=maxW;}
+      if(h>maxH){w*=maxH/h;h=maxH;}
+      canvas.width=w;canvas.height=h;
+      const ctx=canvas.getContext("2d");
+      ctx.drawImage(img,0,0,w,h);
+      canvas.toBlob(blob=>{
+        if(blob)resolve(new File([blob],file.name,{type:"image/jpeg"}));
+        else reject(new Error("Не удалось сжать изображение"));
+      },"image/jpeg",quality);
+    };
+    img.onerror=()=>reject(new Error("Ошибка чтения изображения"));
+    img.src=URL.createObjectURL(file);
+  });
+}
+
+/* ─── Preview handler ─── */
+document.getElementById("edFiles").addEventListener("change",async(e)=>{
+  const file=e.target.files[0];
+  if(!file)return;
+  const preview=document.getElementById("imgPreview");
+  try{
+    const compressed=await compressImage(file);
+    preview.src=URL.createObjectURL(compressed);
+    preview.style.display="block";
+    D("фото сжато: "+Math.round(compressed.size/1024)+"KB");
+  }catch(err){
+    D("ошибка сжатия: "+err.message);
+    preview.style.display="none";
+  }
+});
+
 async function guard(fn,errTarget,lock){
   const L=lock!==false;
   try{if(L)busy(true);D("начало операции…");await fn();D("готово ✓");}
@@ -223,6 +273,7 @@ async function setup(){await guard(async()=>{
   if(!p||p!==p2||p.length<8)throw new Error("Ключи пусты, не совпадают или короче 8 знаков.");
   if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
   GH_TOKEN=token;GH_REPO=repo;
+  localStorage.setItem("gh_token",token);localStorage.setItem("gh_repo",repo);
   sessionStorage.setItem("gh_token",token);sessionStorage.setItem("gh_repo",repo);
   const salt=randSalt();
   D("деривация пароля…");const v=await makeVerifier(p,salt);
@@ -242,12 +293,8 @@ async function setup(){await guard(async()=>{
 
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
-  const token=document.getElementById("loginToken").value.trim();
-  const repo=document.getElementById("loginRepo").value.trim();
   if(!nm)throw new Error("Введи имя оператора.");
-  if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
-  GH_TOKEN=token;GH_REPO=repo;
-  sessionStorage.setItem("gh_token",token);sessionStorage.setItem("gh_repo",repo);
+  if(!GH_TOKEN||!GH_REPO)throw new Error("Нет токена GitHub. Войдите как Магистр или обновите токен.");
   D("загрузка пользователей…");
   USERS=await ghGet("data/users.json")||[];
   const u=USERS.find(x=>x.name===nm);
@@ -323,7 +370,8 @@ async function viewRecord(r){await guard(async()=>{
     '<div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · автор: '+esc(r.author)+' · создано: '+esc(r.created)+' · изменено: '+esc(r.updated)+'</div>'+
     '<div>'+(r.tags||"").split(",").filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join("")+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':"")+
-    '<div class="body-text">'+esc(body)+'</div><div id="fileBox"></div>'+
+    '<div class="body-text">'+esc(body)+'</div>'+
+    (r.image_url?'<div style="margin-top:10px"><img src="'+esc(r.image_url)+'" style="max-width:100%;border-radius:4px;border:1px solid var(--dim)"></div>':"")+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
   document.getElementById("btnEdit").onclick=()=>openEditor(r);
@@ -352,6 +400,9 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edSource").value=r?r.source:"";
   document.getElementById("edBody").value=r?await decText(r.body_enc):"";
   document.getElementById("edFiles").value="";
+  const preview=document.getElementById("imgPreview");
+  if(r&&r.image_url){preview.src=r.image_url;preview.style.display="block";}
+  else{preview.style.display="none";preview.src="";}
   showTabRaw("editor");
 },"edMsg");}
 async function saveRecord(){await guard(async()=>{
@@ -363,13 +414,23 @@ async function saveRecord(){await guard(async()=>{
   const tags=document.getElementById("edTags").value.trim();
   const source=document.getElementById("edSource").value.trim();
   const body_enc=await encText(document.getElementById("edBody").value);
+  
+  let image_url=editingId?editingId.image_url:null;
+  const fileInput=document.getElementById("edFiles");
+  if(fileInput.files.length>0){
+    D("загрузка фото на Postimages…");
+    const compressed=await compressImage(fileInput.files[0]);
+    image_url=await uploadToPostimages(compressed);
+    D("фото загружено: "+image_url);
+  }
+  
   let code,id;
   if(editingId){code=editingId.code;id=editingId.id;}
   else{
     const c=CATS.find(x=>x.name===cat);const pr=c?c.prefix:"ЗАП";
     id=Date.now();code=pr+"-"+String(id).slice(-4);
   }
-  const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
+  const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,image_url:image_url||null,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
   await ghPut("data/records/"+code+".json",rec,(editingId?"РЕДАКТИРОВАНИЕ ":"СОЗДАНИЕ ")+code);
   await addJournal(editingId?"РЕДАКТИРОВАНИЕ":"СОЗДАНИЕ",code);
   msg("edMsg","✓ Запись "+code+" сохранена.",true);
@@ -433,24 +494,25 @@ async function backup(){await guard(async()=>{
 (async()=>{
   D("инициализация КОДЕКСА…");
   try{
-    const savedToken=sessionStorage.getItem("gh_token");
-    const savedRepo=sessionStorage.getItem("gh_repo");
+    const savedToken=sessionStorage.getItem("gh_token")||localStorage.getItem("gh_token");
+    const savedRepo=sessionStorage.getItem("gh_repo")||localStorage.getItem("gh_repo");
     const savedMe=sessionStorage.getItem("jedi_me");
     const savedKey=sessionStorage.getItem("jedi_key");
+    
     if(savedToken&&savedRepo&&savedMe&&savedKey){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;ME=JSON.parse(savedMe);
       VAULT=await importVault(unb64(savedKey));
-      try{CATS=await ghGet("data/categories.json")||[];await enterMain();return;}catch(e){D("автовход: "+e.message);doLogoutUI();}
+      try{CATS=await ghGet("data/categories.json")||[];await enterMain();return;}
+      catch(e){D("автовход: "+e.message);doLogoutUI();}
     }
+    
     if(savedToken&&savedRepo){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;
-      try{const meta=await ghGet("data/meta.json");
-        if(meta&&meta.initialized){document.getElementById("loginBlock").classList.remove("hidden");}
-        else{document.getElementById("setupBlock").classList.remove("hidden");}
-      }catch(e){document.getElementById("setupBlock").classList.remove("hidden");}
-    }else{
+      document.getElementById("loginBlock").classList.remove("hidden");
+    } else {
       document.getElementById("setupBlock").classList.remove("hidden");
     }
+    
     if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка …#k=… от Магистра.",false);
   }catch(e){D("FAIL init: "+e.message);msg("authMsg","Ошибка: "+e.message,false);}
 })();
