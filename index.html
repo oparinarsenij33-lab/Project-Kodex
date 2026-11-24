@@ -65,11 +65,12 @@ label{font-size:12px;color:var(--dim)}
     <input id="setupName" placeholder="Имя Магистра" autocomplete="off">
     <input id="setupPass" type="password" placeholder="Пароль (мин. 8 знаков)">
     <input id="setupPass2" type="password" placeholder="Повторите пароль">
+    <!-- Эти поля нужны только для первичной настройки, потом скроются -->
     <input id="setupToken" type="password" placeholder="GitHub Token (fine-grained)">
     <input id="setupRepo" placeholder="owner/repo (например: oparinarsenij33-lab/Project-Kodex)">
     <button onclick="setup()">СОЗДАТЬ МАГИСТРА</button>
   </div>
- 
+  
   <div id="loginBlock" class="hidden">
     <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
     <input id="loginName" placeholder="Имя оператора" autocomplete="off">
@@ -120,7 +121,7 @@ label{font-size:12px;color:var(--dim)}
     </div>
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
-   
+    
     <label>Текст досье:</label>
     <div class="editor-toolbar">
       <button onclick="execCmd('bold')" title="Жирный"><b>B</b></button>
@@ -137,11 +138,11 @@ label{font-size:12px;color:var(--dim)}
       <button onclick="execCmd('justifyRight')" title="По правому краю">⫸</button>
     </div>
     <div id="edBody" class="editor-content" contenteditable="true"></div>
-   
+    
     <label>Ссылка на фото (imgbb.com):</label>
     <input id="edImageUrl" placeholder="https://i.ibb.co/XXXXX/filename.jpg">
     <img id="imgPreview" class="img-preview">
-   
+    
     <button onclick="saveRecord()">💾 СОХРАНИТЬ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
     <div id="edMsg" class="msg"></div>
@@ -174,12 +175,17 @@ label{font-size:12px;color:var(--dim)}
 <div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b></div>
 
 <script>
+// === ЖЕСТКАЯ НАСТРОЙКА АРХИВА (ДЛЯ ВСЕХ УСТРОЙСТВ) ===
+const HARDCODED_TOKEN = "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";
+const HARDCODED_REPO = "oparinarsenij33-lab/Project-Kodex";
+// ======================================================
+
 var _b=document.createElement("div");_b.textContent="BOOT OK";document.getElementById("diag").appendChild(_b);
 "use strict";
 
-// CONFIGURATION
-let GH_TOKEN = null;
-let GH_REPO = null;
+// Инициализация переменных с приоритетом на жесткий код
+let GH_TOKEN = HARDCODED_TOKEN; 
+let GH_REPO = HARDCODED_REPO;
 let ME = null;
 let VAULT = null;
 let RECORDS = [], CATS = [], USERS = [], JOURNAL = [], editingId = null;
@@ -260,26 +266,24 @@ async function guard(fn,errTarget,lock){
 async function setup(){await guard(async()=>{
   const n=document.getElementById("setupName").value.trim()||"Магистр";
   const p=document.getElementById("setupPass").value,p2=document.getElementById("setupPass2").value;
-  const token=document.getElementById("setupToken").value.trim();
-  const repo=document.getElementById("setupRepo").value.trim();
+  // Используем хардкод-токен, если поле пустое (для удобства)
+  const token=document.getElementById("setupToken").value.trim() || HARDCODED_TOKEN;
+  const repo=document.getElementById("setupRepo").value.trim() || HARDCODED_REPO;
+  
   if(!p||p!==p2||p.length<8)throw new Error("Пароли не совпадают или короче 8 знаков.");
-  if(!token||!repo)throw new Error("Нужны токен и репозиторий.");
- 
+  
   GH_TOKEN=token;GH_REPO=repo;
   localStorage.setItem("gh_token",token);localStorage.setItem("gh_repo",repo);
- 
-  // Save token to GitHub for other devices/users
-  await ghPut("data/token.txt",{token:token,repo:repo},"Save token for all users");
- 
+  
   const salt=randSalt();const v=await makeVerifier(p,salt);
   const raw=crypto.getRandomValues(new Uint8Array(32));VAULT=await importVault(raw);
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
- 
+  
   await ghPut("data/users.json",[{name:n,role:"МАГИСТР",clearance:5,salt,verifier:v,created:now()}],"Init Master");
   await ghPut("data/categories.json",[{name:"ДОСЬЕ",prefix:"ДОС"},{name:"АНОМАЛИЯ",prefix:"АНО"},{name:"АРТЕФАКТ",prefix:"АРТ"},{name:"ПРОТОКОЛ",prefix:"ПРТ"},{name:"ЛОКАЦИЯ",prefix:"ЛОК"},{name:"ЗНАНИЕ",prefix:"ЗНН"}],"Init cats");
   await ghPut("data/journal.json",[],"Init journal");
   await ghPut("data/meta.json",{initialized:true},"Init meta");
- 
+  
   document.getElementById("setupBlock").classList.add("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
   msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ.",true);
@@ -289,15 +293,14 @@ async function setup(){await guard(async()=>{
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
   if(!nm)throw new Error("Введи имя.");
-  if(!GH_TOKEN||!GH_REPO)throw new Error("Архив не настроен.");
- 
+  
   USERS=await ghGet("data/users.json")||[];
   const u=USERS.find(x=>x.name===nm);
   if(!u)throw new Error("Оператор не найден.");
- 
+  
   const v=await makeVerifier(p,u.salt);
   if(v!==u.verifier)throw new Error("Неверный пароль.");
- 
+  
   // Get vault key from URL or session
   let ks=sessionStorage.getItem("jedi_key");
   if(!ks){
@@ -307,7 +310,7 @@ async function login(){await guard(async()=>{
   }
   VAULT=await importVault(unb64(ks));
   ME=u;sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
- 
+  
   await enterMain();
 },"authMsg");}
 
@@ -397,11 +400,11 @@ async function saveRecord(){await guard(async()=>{
   const body_enc=await encText(document.getElementById("edBody").innerHTML);
   let image_url=document.getElementById("edImageUrl").value.trim()||null;
   if(image_url&&!image_url.startsWith("http"))throw new Error("Ссылка должна начинаться с http");
- 
+  
   let code,id;
   if(editingId){code=editingId.code;id=editingId.id;}
   else{const c=CATS.find(x=>x.name===cat);const pr=c?c.prefix:"ЗАП";id=Date.now();code=pr+"-"+String(id).slice(-4);}
- 
+  
   const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,image_url:image_url||null,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
   await ghPut("data/records/"+code+".json",rec,(editingId?"EDIT ":"NEW ")+code);
   await addJournal(editingId?"РЕДАКТИРОВАНИЕ":"СОЗДАНИЕ",code);
@@ -445,135 +448,27 @@ async function backup(){await guard(async()=>{
 (async()=>{
   D("инициализация…");
   try{
-    // Try to load token from GitHub first (for all devices/users)
-    let token=localStorage.getItem("gh_token");
-    let repo=localStorage.getItem("gh_repo");
-   
-    // If not in localStorage, try to fetch from GitHub public file
-    if(!token || !repo){
-      try{
-        // We need a temporary way to get repo name to fetch token.
-        // Since repo name is part of URL, we can extract it or use a default.
-        // For simplicity, we assume the repo is known or we try to fetch token from a known path.
-        // BUT: we can't fetch from GitHub without knowing the repo.
-        // So: we rely on localStorage OR URL params OR setup form.
-        // IMPROVEMENT: We can store repo name in a separate public file or extract from URL.
-        // Let's extract repo from URL path if possible, or use a fallback.
-        const pathParts=location.pathname.split('/').filter(Boolean);
-        // GitHub Pages URLs are usually /repo-name/ or /user/repo-name/
-        // This is tricky. Let's stick to localStorage + Setup form for robustness.
-        // BUT: To make it work across devices WITHOUT setup form for users,
-        // we MUST have a way to get the repo name.
-        // SOLUTION: Hardcode repo name in JS or use a well-known path.
-        // Since this is a specific project, let's try to infer or use a default.
-        // Actually, the best way for "simple login" is to have the token file at a KNOWN location.
-        // But we don't know the repo yet.
-        // COMPROMISE: We will check localStorage. If empty, we show Setup ONLY if no token file exists.
-        // But how do we know if token file exists without repo name?
-        // We can't. So: First time EVER -> Setup. After that -> Token saved to GH -> All devices fetch it.
-        // BUT: To fetch it, we need repo name.
-        // FINAL SOLUTION: We will ask for Repo Name ONLY during Setup. Then save it to GH.
-        // For subsequent logins on NEW devices, we still need Repo Name to fetch Token.
-        // This is a chicken-and-egg problem.
-        // WORKAROUND: We will store Repo Name in a PUBLIC, UNENCRYPTED file at a FIXED URL? No, GitHub Pages doesn't allow fixed URLs across repos.
-        // REAL SOLUTION: The "Simple Login" requires the user to know the Repo Name OR we embed it in the HTML.
-        // Let's embed the Repo Name in the HTML during Setup? No, that's dynamic.
-        // OK, let's change strategy:
-        // 1. Setup saves Token AND Repo Name to `data/config.json` (publicly readable? No, token is secret).
-        // 2. Actually, Token is needed for API calls. If we put it in `data/token.txt`, anyone can read it via API?
-        //    Only if they have a token to read it. Circular dependency.
-        // 3. CORRECT ARCHITECTURE FOR STATIC SITE:
-        //    - Token MUST be in the client-side code (localStorage or hardcoded) to make API calls.
-        //    - To share across devices, we can't use GitHub API to fetch the token (because we need a token to fetch it).
-        //    - UNLESS: We use a PUBLIC endpoint that doesn't require auth. But GitHub Contents API requires auth.
-        //    - ALTERNATIVE: Use a different service for config (e.g., a simple JSON file on a public CDN, or Firebase Remote Config).
-        //    - SIMPLEST FOR USER: Just copy-paste the full link with #k= once per device.
-        //      BUT USER HATES THIS.
-        //    - NEXT SIMPLEST: Hardcode the Repo Name in the JS. Then fetch Token from `data/token.txt` using a PUBLIC method?
-        //      GitHub Raw content is public IF the repo is public.
-        //      YES! If the repo is PUBLIC, we can fetch `https://raw.githubusercontent.com/user/repo/main/data/token.txt` WITHOUT AUTH.
-        //      This solves everything!
-      }catch(e){}
-    }
-   
-    // ATTEMPT TO FETCH TOKEN FROM RAW GITHUB (Requires Public Repo)
-    // We need to know the repo name. Let's try to guess it from URL or use a placeholder.
-    // Since I can't know the user's repo name dynamically without input,
-    // I will add a step: If localStorage is empty, try to fetch from a DEFAULT repo? No.
-    // Let's assume the user will run Setup ONCE on ONE device.
-    // Then, for OTHER devices, we need a way to get the repo name.
-    // Let's add a "Repo Name" field to the Login form? No, user wants simple login.
-    // Let's HARDCODE the repo name in the JS after Setup? No, code is static.
-    // OK, here is the TRICK:
-    // We will save the Repo Name into `data/repo_name.txt` (public).
-    // Then, on new devices, we fetch `repo_name.txt` from RAW github?
-    // But we need the URL to fetch it... which contains the repo name.
-    // CIRCULAR.
-   
-    // PRACTICAL SOLUTION FOR THIS USER:
-    // We will keep the "Setup" form but make it appear ONLY if token is missing.
-    // Once Setup is done, token is in localStorage.
-    // For OTHER DEVICES: The user MUST enter the Repo Name once to fetch the token.
-    // BUT USER WANTS NO INPUT.
-    // OK, I will implement the "Public Raw Fetch" assuming the repo name is KNOWN or CAN BE EXTRACTED.
-    // Since this is a specific deployment (`oparinarsenij33-lab/Project-Kodex`),
-    // I will HARDCODE the repo name in the JS for the "Auto-Fetch" feature.
-    // User can change it in code if needed, or I can make it dynamic later.
-    // FOR NOW: Hardcode `oparinarsenij33-lab/Project-Kodex` as the default repo to fetch config from.
-   
-    const DEFAULT_REPO = "oparinarsenij33-lab/Project-Kodex";
-   
-    if(!token || !repo){
-      try{
-        // Fetch repo name from raw github? No, we hardcode it for now.
-        // Fetch token from raw github (public file)
-        const rawTokenUrl = `https://raw.githubusercontent.com/${DEFAULT_REPO}/main/data/token.txt`;
-        const r = await fetch(rawTokenUrl);
-        if(r.ok){
-          const txt = await r.text();
-          // Expected format: {"token":"...","repo":"..."} or just token?
-          // Let's assume we saved JSON in setup.
-          try{
-            const cfg = JSON.parse(txt);
-            token = cfg.token;
-            repo = cfg.repo || DEFAULT_REPO;
-            localStorage.setItem("gh_token", token);
-            localStorage.setItem("gh_repo", repo);
-            D("Токен загружен из облака");
-          }catch(e){
-            // Maybe it's just plain text token?
-            token = txt.trim();
-            repo = DEFAULT_REPO;
-            localStorage.setItem("gh_token", token);
-            localStorage.setItem("gh_repo", repo);
-            D("Токен загружен (plain)");
-          }
-        }
-      }catch(e){
-        D("Не удалось загрузить токен из облака: "+e.message);
-      }
-    }
-   
-    GH_TOKEN = token;
-    GH_REPO = repo || DEFAULT_REPO; // Fallback
-   
-    // Check session
+    // Проверяем сессию
     const savedMe=sessionStorage.getItem("jedi_me");
     const savedKey=sessionStorage.getItem("jedi_key");
-   
+    
+    // Если есть активная сессия и токен (из хардкода или localStorage) -> входим
     if(GH_TOKEN && GH_REPO && savedMe && savedKey){
       ME=JSON.parse(savedMe);
       VAULT=await importVault(unb64(savedKey));
       try{CATS=await ghGet("data/categories.json")||[];await enterMain();return;}
       catch(e){D("автовход: "+e.message);logout();}
     }
-   
-    if(GH_TOKEN && GH_REPO){
-      document.getElementById("loginBlock").classList.remove("hidden");
-    } else {
+    
+    // Если токена нет вообще (ни в коде, ни в памяти) -> показываем настройку
+    // Но так как мы его захардкодили, сюда попадем только если код сломан
+    if(!GH_TOKEN || !GH_REPO){
       document.getElementById("setupBlock").classList.remove("hidden");
+    } else {
+      // Токен есть -> показываем простой вход
+      document.getElementById("loginBlock").classList.remove("hidden");
     }
-   
+    
     if(!location.hash.startsWith("#k=") && !savedKey) msg("authMsg","Для первого входа нужна полная ссылка с ключом.",false);
   }catch(e){D("FAIL init: "+e.message);msg("authMsg","Ошибка: "+e.message,false);}
 })();
