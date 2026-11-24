@@ -105,8 +105,8 @@ label{font-size:12px;color:var(--dim)}
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <textarea id="edBody" placeholder="Текст досье…"></textarea>
-    <label>Прикрепить фото (автосжатие до 800x600):</label>
-    <input type="file" id="edFiles" accept="image/*">
+    <label>Ссылка на фото (загрузи на postimages.org и вставь прямую ссылку):</label>
+    <input id="edImageUrl" placeholder="https://i.postimg.cc/xxxxx.jpg">
     <img id="imgPreview" class="img-preview">
     <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
@@ -207,53 +207,17 @@ async function ghList(dir){
   return await r.json();
 }
 
-/* ─── Postimages upload ─── */
-async function uploadToPostimages(file){
-  const fd=new FormData();
-  fd.append("image",file);
-  fd.append("type","file");
-  const r=await withTimeout(fetch("https://postimages.org/json/rr",{method:"POST",body:fd}),30000,"загрузка на Postimages");
-  if(!r.ok)throw new Error("Ошибка загрузки на Postimages: "+r.status);
-  const j=await r.json();
-  if(!j.url)throw new Error("Postimages не вернул ссылку");
-  return j.url; // прямая ссылка на изображение
-}
-
-/* ─── Image compression ─── */
-async function compressImage(file,maxW=800,maxH=600,quality=0.8){
-  return new Promise((resolve,reject)=>{
-    const img=new Image();
-    img.onload=()=>{
-      const canvas=document.createElement("canvas");
-      let w=img.width,h=img.height;
-      if(w>maxW){h*=maxW/w;w=maxW;}
-      if(h>maxH){w*=maxH/h;h=maxH;}
-      canvas.width=w;canvas.height=h;
-      const ctx=canvas.getContext("2d");
-      ctx.drawImage(img,0,0,w,h);
-      canvas.toBlob(blob=>{
-        if(blob)resolve(new File([blob],file.name,{type:"image/jpeg"}));
-        else reject(new Error("Не удалось сжать изображение"));
-      },"image/jpeg",quality);
-    };
-    img.onerror=()=>reject(new Error("Ошибка чтения изображения"));
-    img.src=URL.createObjectURL(file);
-  });
-}
-
-/* ─── Preview handler ─── */
-document.getElementById("edFiles").addEventListener("change",async(e)=>{
-  const file=e.target.files[0];
-  if(!file)return;
+/* ─── Preview handler for image URL ─── */
+document.getElementById("edImageUrl").addEventListener("input",(e)=>{
+  const url=e.target.value.trim();
   const preview=document.getElementById("imgPreview");
-  try{
-    const compressed=await compressImage(file);
-    preview.src=URL.createObjectURL(compressed);
+  if(url && (url.startsWith("http://") || url.startsWith("https://"))){
+    preview.src=url;
     preview.style.display="block";
-    D("фото сжато: "+Math.round(compressed.size/1024)+"KB");
-  }catch(err){
-    D("ошибка сжатия: "+err.message);
+    preview.onerror=()=>{preview.style.display="none";};
+  } else {
     preview.style.display="none";
+    preview.src="";
   }
 });
 
@@ -399,7 +363,7 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edTags").value=r?r.tags:"";
   document.getElementById("edSource").value=r?r.source:"";
   document.getElementById("edBody").value=r?await decText(r.body_enc):"";
-  document.getElementById("edFiles").value="";
+  document.getElementById("edImageUrl").value=r&&r.image_url?r.image_url:"";
   const preview=document.getElementById("imgPreview");
   if(r&&r.image_url){preview.src=r.image_url;preview.style.display="block";}
   else{preview.style.display="none";preview.src="";}
@@ -415,13 +379,9 @@ async function saveRecord(){await guard(async()=>{
   const source=document.getElementById("edSource").value.trim();
   const body_enc=await encText(document.getElementById("edBody").value);
   
-  let image_url=editingId?editingId.image_url:null;
-  const fileInput=document.getElementById("edFiles");
-  if(fileInput.files.length>0){
-    D("загрузка фото на Postimages…");
-    const compressed=await compressImage(fileInput.files[0]);
-    image_url=await uploadToPostimages(compressed);
-    D("фото загружено: "+image_url);
+  let image_url=document.getElementById("edImageUrl").value.trim()||null;
+  if(image_url && !(image_url.startsWith("http://") || image_url.startsWith("https://"))){
+    throw new Error("Ссылка на фото должна начинаться с http:// или https://");
   }
   
   let code,id;
