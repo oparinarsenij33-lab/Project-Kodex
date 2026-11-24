@@ -71,7 +71,7 @@ label{font-size:12px;color:var(--dim)}
     <input id="setupRepo" placeholder="owner/repo (например: oparinarsenij33-lab/Project-Kodex)">
     <button onclick="setup()">СОЗДАТЬ МАГИСТРА</button>
   </div>
-  
+ 
   <div id="loginBlock" class="hidden">
     <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
     <input id="loginName" placeholder="Имя оператора" autocomplete="off">
@@ -122,7 +122,7 @@ label{font-size:12px;color:var(--dim)}
     </div>
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
-    
+   
     <!-- Rich Text Toolbar -->
     <label>Текст досье:</label>
     <div class="editor-toolbar">
@@ -141,11 +141,11 @@ label{font-size:12px;color:var(--dim)}
       <button onclick="execCmd('justifyRight')" title="По правому краю">⫸</button>
     </div>
     <div id="edBody" class="editor-content" contenteditable="true"></div>
-    
+   
     <label>Ссылка на фото (imgbb.com):</label>
     <input id="edImageUrl" placeholder="https://i.ibb.co/XXXXX/filename.jpg">
     <img id="imgPreview" class="img-preview">
-    
+   
     <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
     <div id="edMsg" class="msg"></div>
@@ -183,7 +183,7 @@ var _b=document.createElement("div");_b.textContent="BOOT OK — скрипт ж
 
 // CONFIGURATION FOR ORDINARY USERS
 // Master sets this once during setup. Ordinary users never see tokens.
-let GH_TOKEN = localStorage.getItem("gh_token") || null; 
+let GH_TOKEN = localStorage.getItem("gh_token") || null;
 let GH_REPO = localStorage.getItem("gh_repo") || null;
 
 let ME = JSON.parse(sessionStorage.getItem("jedi_me") || "null");
@@ -295,28 +295,28 @@ async function setup(){await guard(async()=>{
   const repo=document.getElementById("setupRepo").value.trim();
   if(!p||p!==p2||p.length<8)throw new Error("Ключи пусты, не совпадают или короче 8 знаков.");
   if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
-  
+ 
   // Save credentials permanently for all users on this device/browser
   GH_TOKEN=token; GH_REPO=repo;
-  localStorage.setItem("gh_token",token); 
+  localStorage.setItem("gh_token",token);
   localStorage.setItem("gh_repo",repo);
-  sessionStorage.setItem("gh_token",token); 
+  sessionStorage.setItem("gh_token",token);
   sessionStorage.setItem("gh_repo",repo);
-  
+ 
   const salt=randSalt();
   D("деривация пароля…");const v=await makeVerifier(p,salt);
   const raw=crypto.getRandomValues(new Uint8Array(32));
   VAULT=await importVault(raw);
-  
+ 
   // Generate Holocron Key for encryption
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
-  
+ 
   const user={name:n,role:"МАГИСТР",clearance:5,salt,verifier:v,created:now()};
   await ghPut("data/users.json",[user],"ПЕРВОЕ ПРОБУЖДЕНИЕ: Магистр "+n);
   await ghPut("data/categories.json",[{name:"ДОСЬЕ",prefix:"ДОС"},{name:"АНОМАЛИЯ",prefix:"АНО"},{name:"АРТЕФАКТ",prefix:"АРТ"},{name:"ПРОТОКОЛ",prefix:"ПРТ"},{name:"ЛОКАЦИЯ",prefix:"ЛОК"},{name:"ЗНАНИЕ",prefix:"ЗНН"}],"init categories");
   await ghPut("data/journal.json",[],"init journal");
   await ghPut("data/meta.json",{initialized:true},"init meta");
-  
+ 
   document.getElementById("setupBlock").classList.add("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
   msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона.",true);
@@ -327,25 +327,25 @@ async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
   if(!nm)throw new Error("Введи имя оператора.");
   if(!GH_TOKEN||!GH_REPO)throw new Error("Архив не настроен. Обратитесь к Магистру.");
-  
+ 
   D("загрузка пользователей…");
   USERS=await ghGet("data/users.json")||[];
   const u=USERS.find(x=>x.name===nm);
   if(!u)throw new Error("Оператор «"+nm+"» не найден.");
-  
+ 
   D("деривация пароля…");const v=await makeVerifier(p,u.salt);
   if(v!==u.verifier)throw new Error("Неверный ключ доступа.");
-  
+ 
   // Get Vault Key from URL hash (Holocron Key)
   const hash=location.hash;
   if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Нужна полная ссылка …#k=…");
   let ks=hash.slice(3).replace(/-/g,"+").replace(/_/g,"/");while(ks.length%4)ks+="=";
   VAULT=await importVault(unb64(ks));
-  
+ 
   ME=u;
   sessionStorage.setItem("jedi_me",JSON.stringify(ME));
   sessionStorage.setItem("jedi_key",ks);
-  
+ 
   D("вход выполнен");
   await enterMain();
 },"authMsg");}
@@ -365,11 +365,11 @@ async function enterMain(){
   document.getElementById("uName").textContent=ME.name;
   document.getElementById("uRole").textContent=ME.role;
   document.getElementById("uClear").textContent=ME.clearance;
-  
+ 
   // Show Council/Backup only for high clearance
   document.getElementById("councilBtn").style.display=ME.clearance>=5?"":"none";
   document.getElementById("backupBtn").style.display=ME.clearance>=5?"":"none";
-  
+ 
   CATS=await ghGet("data/categories.json")||[];
   fillCatSelect();
   showTab("list");
@@ -408,9 +408,9 @@ function renderList(){
       div.innerHTML='<span class="locked">▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — требуется допуск '+r.clearance+']</span>';
       box.appendChild(div);shown++;continue;
     }
-    
+   
     if(q&&!((r.title||"")+(r.tags||"")+r.code+(r.category||"")+(r.source||"")).toLowerCase().includes(q))continue;
-    
+   
     const div=document.createElement("div");div.className="rec";
     div.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · '+esc(r.updated)+'</div>';
     div.onclick=()=>viewRecord(r);box.appendChild(div);shown++;
@@ -421,7 +421,7 @@ function renderList(){
 async function viewRecord(r){await guard(async()=>{
   const body=await decText(r.body_enc);
   const vc=document.getElementById("viewContent");
-  
+ 
   // Render HTML content safely
   vc.innerHTML=
     '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
@@ -432,7 +432,7 @@ async function viewRecord(r){await guard(async()=>{
     (r.image_url?'<img src="'+esc(r.image_url)+'" class="img-dossier" alt="Фото досье" onerror="this.style.display=\'none\'">':"")+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
-    
+   
   document.getElementById("btnEdit").onclick=()=>openEditor(r);
   const bd=document.getElementById("btnDel");if(bd)bd.onclick=()=>deleteRecord(r);
   showTabRaw("view");
@@ -460,7 +460,7 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edClear").value=r?r.clearance:Math.min(3,ME.clearance);
   document.getElementById("edTags").value=r?r.tags:"";
   document.getElementById("edSource").value=r?r.source:"";
-  
+ 
   // Load Rich Text Content
   const bodyDiv = document.getElementById("edBody");
   if(r){
@@ -469,7 +469,7 @@ async function openEditor(r){await guard(async()=>{
   } else {
     bodyDiv.innerHTML = "";
   }
-  
+ 
   document.getElementById("edImageUrl").value=r&&r.image_url?r.image_url:"";
   const preview=document.getElementById("imgPreview");
   if(r&&r.image_url){
@@ -485,29 +485,29 @@ async function openEditor(r){await guard(async()=>{
 async function saveRecord(){await guard(async()=>{
   const title=document.getElementById("edTitle").value.trim();
   if(!title)throw new Error("Пустое название.");
-  
+ 
   D("шифрование…");
   const cat=document.getElementById("edCat").value;
   const cl=parseInt(document.getElementById("edClear").value);
   const tags=document.getElementById("edTags").value.trim();
   const source=document.getElementById("edSource").value.trim();
-  
+ 
   // Get HTML content from rich text editor
   const htmlContent = document.getElementById("edBody").innerHTML;
   const body_enc=await encText(htmlContent);
-  
+ 
   let image_url=document.getElementById("edImageUrl").value.trim()||null;
   if(image_url && !(image_url.startsWith("http://") || image_url.startsWith("https://"))){
     throw new Error("Ссылка на фото должна начинаться с http:// или https://");
   }
-  
+ 
   let code,id;
   if(editingId){code=editingId.code;id=editingId.id;}
   else{
     const c=CATS.find(x=>x.name===cat);const pr=c?c.prefix:"ЗАП";
     id=Date.now();code=pr+"-"+String(id).slice(-4);
   }
-  
+ 
   const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,image_url:image_url||null,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
   await ghPut("data/records/"+code+".json",rec,(editingId?"РЕДАКТИРОВАНИЕ ":"СОЗДАНИЕ ")+code);
   await addJournal(editingId?"РЕДАКТИРОВАНИЕ":"СОЗДАНИЕ",code);
@@ -584,7 +584,7 @@ async function backup(){await guard(async()=>{
     const savedRepo=sessionStorage.getItem("gh_repo")||localStorage.getItem("gh_repo");
     const savedMe=sessionStorage.getItem("jedi_me");
     const savedKey=sessionStorage.getItem("jedi_key");
-    
+   
     // Auto-login if session exists
     if(savedToken&&savedRepo&&savedMe&&savedKey){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;ME=JSON.parse(savedMe);
@@ -592,7 +592,7 @@ async function backup(){await guard(async()=>{
       try{CATS=await ghGet("data/categories.json")||[];await enterMain();return;}
       catch(e){D("автовход: "+e.message);doLogoutUI();}
     }
-    
+   
     // If credentials exist but no session -> show simple login
     if(savedToken&&savedRepo){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;
@@ -601,7 +601,7 @@ async function backup(){await guard(async()=>{
       // No credentials -> show Master setup
       document.getElementById("setupBlock").classList.remove("hidden");
     }
-    
+   
     if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка …#k=… от Магистра.",false);
   }catch(e){D("FAIL init: "+e.message);msg("authMsg","Ошибка: "+e.message,false);}
 })();
