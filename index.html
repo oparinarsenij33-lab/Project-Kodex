@@ -53,12 +53,16 @@ label{font-size:12px;color:var(--dim)}
     <input id="setupName" placeholder="Имя Магистра" autocomplete="off">
     <input id="setupPass" type="password" placeholder="Ключ доступа (пароль, мин. 8 знаков)">
     <input id="setupPass2" type="password" placeholder="Повторите ключ">
+    <input id="setupToken" type="password" placeholder="GitHub Token (fine-grained, Contents read/write)">
+    <input id="setupRepo" placeholder="owner/repo (например: oparinarsenij33-lab/Project-Kodex)">
     <button onclick="setup()">СОЗДАТЬ МАГИСТРА</button>
   </div>
   <div id="loginBlock" class="hidden">
     <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
     <input id="loginName" placeholder="Имя оператора" autocomplete="off">
     <input id="loginPass" type="password" placeholder="Ключ доступа" onkeydown="if(event.key==='Enter')login()">
+    <input id="loginToken" type="password" placeholder="GitHub Token">
+    <input id="loginRepo" placeholder="owner/repo">
     <button onclick="login()">ВОЙТИ В АРХИВ</button>
   </div>
   <div id="authMsg" class="msg"></div>
@@ -131,16 +135,17 @@ label{font-size:12px;color:var(--dim)}
     <div id="councilMsg" class="msg"></div>
   </div>
 </div>
-<div class="sub">AES-256-GCM · ключ Голокрона у Ордена · Cloudflare Workers + D1</div>
+<div class="sub">AES-256-GCM · Git-based database · GitHub Pages + API</div>
 </div>
 <div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b></div>
 
 <script>
 var _b=document.createElement("div");_b.textContent="BOOT OK — скрипт жив";document.getElementById("diag").appendChild(_b);
 "use strict";
-let TOKEN=sessionStorage.getItem("jedi_token")||null;
+let GH_TOKEN=sessionStorage.getItem("gh_token")||null;
+let GH_REPO=sessionStorage.getItem("gh_repo")||null;
 let ME=JSON.parse(sessionStorage.getItem("jedi_me")||"null");
-let VAULT=null, RECORDS=[], CATS=[], editingId=null;
+let VAULT=null, RECORDS=[], CATS=[], USERS=[], JOURNAL=[], editingId=null;
 const te=new TextEncoder(), td=new TextDecoder();
 function b64(buf){const a=new Uint8Array(buf);let s="";for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(s);}
 function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
@@ -151,7 +156,7 @@ let lockN=0,lockT=0;
 function busy(on){lockN=Math.max(0,lockN+(on?1:-1));lockT=Date.now();const d=lockN>0;document.querySelectorAll("#authScreen button, #mainScreen button").forEach(b=>b.disabled=d);}
 setInterval(function(){if(lockN>0&&Date.now()-lockT>70000){lockN=0;busy(false);D("страховка: кнопки разблокированы");}},5000);
 function withTimeout(promise,ms,label){
-  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+": Worker не ответил за "+ms+"мс (база просыпается, подождите или повторите)")),ms))]);
+  return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+": таймаут "+ms+"мс")),ms))]);
 }
 async function derive(pass,salt){
   const km=await crypto.subtle.importKey("raw",te.encode(pass),"PBKDF2",false,["deriveBits"]);
@@ -169,57 +174,98 @@ async function decText(payload){
   }catch(e){return "[ОШИБКА РАСШИФРОВКИ — неверный ключ Голокрона]";}
 }
 function randSalt(){return b64(crypto.getRandomValues(new Uint8Array(16)));}
-async function api(path,method,body){
-  const opt={method:method||"GET",headers:{}};
-  if(TOKEN)opt.headers["x-token"]=TOKEN;
-  if(body!==undefined){opt.headers["Content-Type"]="application/json";opt.body=JSON.stringify(body);}
-  const r=await withTimeout(fetch("/api"+path,opt),60000,"запрос "+path);
-  let data;
-  try{data=await r.json();}catch(e){throw new Error("Worker вернул не-JSON (старая версия деплоя или сбой 1102). Статус: "+r.status);}
-  if(!r.ok){if(r.status===401&&ME){alert("Сеанс истёк. Войдите заново.");doLogoutUI();}throw new Error(data.error||("Ошибка связи: "+r.status));}
-  return data;
+function now(){return new Date().toLocaleString("ru-RU");}
+
+/* ─── GitHub API helpers ─── */
+async function ghGet(path){
+  const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"чтение "+path);
+  if(r.status===404)return null;
+  if(!r.ok)throw new Error("GitHub GET "+path+": "+r.status);
+  const j=await r.json();
+  return JSON.parse(td.decode(unb64(j.content.replace(/\n/g,""))));
 }
+async function ghPut(path,data,message){
+  let sha=null;
+  try{const existing=await fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}});
+    if(existing.ok){const ej=await existing.json();sha=ej.sha;}}catch(e){}
+  const body={message:message||"update "+path,content:b64(te.encode(JSON.stringify(data,null,2)))};
+  if(sha)body.sha=sha;
+  const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{method:"PUT",headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json","Content-Type":"application/json"},body:JSON.stringify(body)}),30000,"запись "+path);
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error("GitHub PUT "+path+": "+(e.message||r.status));}
+  return await r.json();
+}
+async function ghDelete(path,message){
+  const existing=await fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}});
+  if(!existing.ok)return;
+  const ej=await existing.json();
+  await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{method:"DELETE",headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json","Content-Type":"application/json"},body:JSON.stringify({message:message||"delete "+path,sha:ej.sha})}),30000,"удаление "+path);
+}
+async function ghList(dir){
+  const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+dir,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"листинг "+dir);
+  if(r.status===404)return[];
+  if(!r.ok)throw new Error("GitHub LIST "+dir+": "+r.status);
+  return await r.json();
+}
+
 async function guard(fn,errTarget,lock){
   const L=lock!==false;
   try{if(L)busy(true);D("начало операции…");await fn();D("готово ✓");}
   catch(e){D("ОШИБКА: "+e.message);if(errTarget)msg(errTarget,e.message,false);else alert(e.message);}
   finally{if(L)busy(false);}
 }
+
+/* ─── Setup / Login ─── */
 async function setup(){await guard(async()=>{
   const n=document.getElementById("setupName").value.trim()||"Магистр";
   const p=document.getElementById("setupPass").value,p2=document.getElementById("setupPass2").value;
+  const token=document.getElementById("setupToken").value.trim();
+  const repo=document.getElementById("setupRepo").value.trim();
   if(!p||p!==p2||p.length<8)throw new Error("Ключи пусты, не совпадают или короче 8 знаков.");
+  if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
+  GH_TOKEN=token;GH_REPO=repo;
+  sessionStorage.setItem("gh_token",token);sessionStorage.setItem("gh_repo",repo);
   const salt=randSalt();
-  D("деривация пароля (250k)…");const v=await makeVerifier(p,salt);D("хеш готов");
-  await api("/setup","POST",{name:n,salt,verifier:v});
+  D("деривация пароля…");const v=await makeVerifier(p,salt);
   const raw=crypto.getRandomValues(new Uint8Array(32));
+  VAULT=await importVault(raw);
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  const user={name:n,role:"МАГИСТР",clearance:5,salt,verifier:v,created:now()};
+  await ghPut("data/users.json",[user],"ПЕРВОЕ ПРОБУЖДЕНИЕ: Магистр "+n);
+  await ghPut("data/categories.json",[{name:"ДОСЬЕ",prefix:"ДОС"},{name:"АНОМАЛИЯ",prefix:"АНО"},{name:"АРТЕФАКТ",prefix:"АРТ"},{name:"ПРОТОКОЛ",prefix:"ПРТ"},{name:"ЛОКАЦИЯ",prefix:"ЛОК"},{name:"ЗНАНИЕ",prefix:"ЗНН"}],"init categories");
+  await ghPut("data/journal.json",[],"init journal");
+  await ghPut("data/meta.json",{initialized:true},"init meta");
   document.getElementById("setupBlock").classList.add("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
-  msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона и передавай только членам Ордена.",true);
-  prompt("ССЫЛКА-КЛЮЧ ГОЛОКРОНА — сохрани её! Без неё записи не прочитать:",link);
+  msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона.",true);
+  prompt("ССЫЛКА-КЛЮЧ ГОЛОКРОНА — сохрани её!",link);
 },"authMsg");}
+
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
+  const token=document.getElementById("loginToken").value.trim();
+  const repo=document.getElementById("loginRepo").value.trim();
   if(!nm)throw new Error("Введи имя оператора.");
-  D("запрос соли для "+nm+"…");
-  const st=await withTimeout(fetch("/api/salt?name="+encodeURIComponent(nm)),60000,"получение соли").then(r=>r.json()).catch(e=>{throw new Error("Не удалось получить соль: "+e.message);});
-  if(!st.salt)throw new Error("Оператор «"+nm+"» не найден в Архиве.");
-  D("соль получена, деривация пароля (250k, ~1-3 сек)…");
-  const t0=performance.now();const v=await makeVerifier(p,st.salt);D("хеш готов за "+Math.round(performance.now()-t0)+"мс");
+  if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
+  GH_TOKEN=token;GH_REPO=repo;
+  sessionStorage.setItem("gh_token",token);sessionStorage.setItem("gh_repo",repo);
+  D("загрузка пользователей…");
+  USERS=await ghGet("data/users.json")||[];
+  const u=USERS.find(x=>x.name===nm);
+  if(!u)throw new Error("Оператор «"+nm+"» не найден.");
+  D("деривация пароля…");const v=await makeVerifier(p,u.salt);
+  if(v!==u.verifier)throw new Error("Неверный ключ доступа.");
   const hash=location.hash;
-  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Открой Архив по полной ссылке-приглашению …#k=… от Магистра.");
-  D("проверка доступа на сервере…");
-  const d=await api("/login","POST",{name:nm,verifier:v});
+  if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Нужна полная ссылка …#k=…");
   let ks=hash.slice(3).replace(/-/g,"+").replace(/_/g,"/");while(ks.length%4)ks+="=";
-  D("импорт ключа Голокрона…");VAULT=await importVault(unb64(ks));
-  TOKEN=d.token;ME=d;
-  sessionStorage.setItem("jedi_token",TOKEN);sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
+  VAULT=await importVault(unb64(ks));
+  ME=u;sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
+  D("вход выполнен");
   await enterMain();
 },"authMsg");}
-async function logout(){try{await api("/logout","POST",{});}catch(e){}doLogoutUI();}
+
+async function logout(){doLogoutUI();}
 function doLogoutUI(){
-  TOKEN=null;ME=null;VAULT=null;sessionStorage.clear();lockN=0;busy(false);
+  GH_TOKEN=null;GH_REPO=null;ME=null;VAULT=null;sessionStorage.clear();lockN=0;busy(false);
   document.getElementById("mainScreen").classList.add("hidden");
   document.getElementById("authScreen").classList.remove("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
@@ -233,7 +279,7 @@ async function enterMain(){
   document.getElementById("uClear").textContent=ME.clearance;
   document.getElementById("councilBtn").style.display=ME.clearance>=5?"":"none";
   document.getElementById("backupBtn").style.display=ME.clearance>=5?"":"none";
-  CATS=await api("/categories");fillCatSelect();showTab("list");
+  CATS=await ghGet("data/categories.json")||[];fillCatSelect();showTab("list");
 }
 const TABS=["list","view","editor","cats","journal","council"];
 function showTabRaw(t){TABS.forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));}
@@ -244,24 +290,33 @@ function showTab(t){
   if(t==="journal")guard(renderJournal,null,false);
   if(t==="council")guard(renderCouncil,null,false);
 }
-async function loadRecords(){RECORDS=await api("/records");renderList();}
+async function loadRecords(){
+  D("загрузка записей…");
+  const files=await ghList("data/records");
+  RECORDS=[];
+  for(const f of files){
+    if(!f.name.endsWith(".json"))continue;
+    try{const rec=await ghGet("data/records/"+f.name);if(rec)RECORDS.push(rec);}catch(e){D("пропуск "+f.name+": "+e.message);}
+  }
+  RECORDS.sort((a,b)=>(b.id||0)-(a.id||0));
+  renderList();D("загружено: "+RECORDS.length);
+}
 function renderList(){
   const q=(document.getElementById("searchBox").value||"").toLowerCase();
   const box=document.getElementById("recList");box.innerHTML="";let shown=0;
   for(const r of RECORDS){
-    if(r.locked){if(q)continue;
+    if(r.clearance>ME.clearance){if(q)continue;
       const div=document.createElement("div");div.className="rec";
-      div.innerHTML='<span class="locked">▓▓▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — допуск '+r.clearance+']</span>';
+      div.innerHTML='<span class="locked">▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — допуск '+r.clearance+']</span>';
       box.appendChild(div);shown++;continue;}
     if(q&&!((r.title||"")+(r.tags||"")+r.code+(r.category||"")+(r.source||"")).toLowerCase().includes(q))continue;
     const div=document.createElement("div");div.className="rec";
     div.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · '+esc(r.updated)+'</div>';
-    div.onclick=()=>viewRecord(r.id);box.appendChild(div);shown++;
+    div.onclick=()=>viewRecord(r);box.appendChild(div);shown++;
   }
   if(!shown)box.innerHTML='<p class="meta">Архив молчит… записей не найдено.</p>';
 }
-async function viewRecord(id){await guard(async()=>{
-  const r=await api("/records/"+id);
+async function viewRecord(r){await guard(async()=>{
   const body=await decText(r.body_enc);
   const vc=document.getElementById("viewContent");vc.innerHTML=
     '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
@@ -271,39 +326,24 @@ async function viewRecord(id){await guard(async()=>{
     '<div class="body-text">'+esc(body)+'</div><div id="fileBox"></div>'+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
-  document.getElementById("btnEdit").onclick=()=>openEditor(r.id);
-  const bd=document.getElementById("btnDel");if(bd)bd.onclick=()=>deleteRecord(r.id,r.code);
-  const fb=document.getElementById("fileBox");
-  (r.files||[]).forEach(f=>{
-    const d=document.createElement("div");d.className="fileitem";
-    d.innerHTML="📎 "+esc(f.filename)+" ("+f.size+" б) ";
-    const b1=document.createElement("button");b1.textContent="СКАЧАТЬ";b1.onclick=()=>downloadFile(f.id,f.filename);
-    const b2=document.createElement("button");b2.textContent="ПРОВЕРИТЬ ЦЕЛОСТНОСТЬ";b2.onclick=()=>checkFile(f.id);
-    d.appendChild(b1);d.appendChild(b2);fb.appendChild(d);
-  });
+  document.getElementById("btnEdit").onclick=()=>openEditor(r);
+  const bd=document.getElementById("btnDel");if(bd)bd.onclick=()=>deleteRecord(r);
   showTabRaw("view");
 });}
-async function downloadFile(fid,name){await guard(async()=>{
-  const r=await withTimeout(fetch("/api/files/"+fid,{headers:{"x-token":TOKEN}}),60000,"скачивание");
-  if(!r.ok)throw new Error("Недостаточный допуск или файл не найден.");
-  const blob=await r.blob();
-  const a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;a.click();
-});}
-async function checkFile(fid){await guard(async()=>{
-  const d=await api("/files/"+fid+"/check");
-  alert(d.ok?("✓ Целостность подтверждена. SHA-256: "+d.sha256.slice(0,16)+"…"):"✖ ЦЕЛОСТНОСТЬ НАРУШЕНА!");
-});}
-async function deleteRecord(id,code){
-  if(!confirm("Удалить "+code+" навсегда?"))return;
-  await guard(async()=>{await api("/records/"+id,"DELETE");showTab("list");});
+async function deleteRecord(r){
+  if(!confirm("Удалить "+r.code+" навсегда?"))return;
+  await guard(async()=>{
+    await ghDelete("data/records/"+r.code+".json","УДАЛЕНИЕ "+r.code);
+    await addJournal("УДАЛЕНИЕ",r.code);
+    showTab("list");
+  });
 }
 function fillCatSelect(){
   const s=document.getElementById("edCat");s.innerHTML="";
   CATS.forEach(c=>{const o=document.createElement("option");o.value=c.name;o.textContent=c.name;s.appendChild(o);});
 }
-async function openEditor(id){await guard(async()=>{
-  editingId=id||null;
-  const r=id?await api("/records/"+id):null;
+async function openEditor(r){await guard(async()=>{
+  editingId=r||null;
   document.getElementById("editorTitle").textContent=r?"─── РЕДАКТИРОВАНИЕ "+r.code+" ───":"─── НОВАЯ ЗАПИСЬ ───";
   document.getElementById("edTitle").value=r?r.title:"";
   document.getElementById("edCat").value=r?r.category:"ДОСЬЕ";
@@ -316,63 +356,76 @@ async function openEditor(id){await guard(async()=>{
 },"edMsg");}
 async function saveRecord(){await guard(async()=>{
   const title=document.getElementById("edTitle").value.trim();
-  if(!title)throw new Error("Пустое название — Архив не принимает.");
-  D("шифрование тела записи…");
-  const payload={title,
-    category:document.getElementById("edCat").value,
-    clearance:parseInt(document.getElementById("edClear").value),
-    tags:document.getElementById("edTags").value.trim(),
-    source:document.getElementById("edSource").value.trim(),
-    body_enc:await encText(document.getElementById("edBody").value)};
-  let id=editingId,code;
-  if(editingId){await api("/records/"+editingId,"PUT",payload);}
-  else{const d=await api("/records","POST",payload);id=d.id;code=d.code;}
-  const fi=document.getElementById("edFiles");
-  if(fi.files.length){
-    const fd=new FormData();for(const f of fi.files)fd.append("files",f);
-    const r=await withTimeout(fetch("/api/records/"+id+"/files",{method:"POST",headers:{"x-token":TOKEN},body:fd}),60000,"загрузка файлов");
-    if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.error||"Ошибка загрузки файлов");}
+  if(!title)throw new Error("Пустое название.");
+  D("шифрование…");
+  const cat=document.getElementById("edCat").value;
+  const cl=parseInt(document.getElementById("edClear").value);
+  const tags=document.getElementById("edTags").value.trim();
+  const source=document.getElementById("edSource").value.trim();
+  const body_enc=await encText(document.getElementById("edBody").value);
+  let code,id;
+  if(editingId){code=editingId.code;id=editingId.id;}
+  else{
+    const c=CATS.find(x=>x.name===cat);const pr=c?c.prefix:"ЗАП";
+    id=Date.now();code=pr+"-"+String(id).slice(-4);
   }
-  msg("edMsg","✓ Запись "+(code||"")+" сохранена.",true);
-  setTimeout(()=>viewRecord(id),400);
+  const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
+  await ghPut("data/records/"+code+".json",rec,(editingId?"РЕДАКТИРОВАНИЕ ":"СОЗДАНИЕ ")+code);
+  await addJournal(editingId?"РЕДАКТИРОВАНИЕ":"СОЗДАНИЕ",code);
+  msg("edMsg","✓ Запись "+code+" сохранена.",true);
+  setTimeout(()=>viewRecord(rec),400);
 },"edMsg");}
 async function renderCats(){
-  CATS=await api("/categories");
+  CATS=await ghGet("data/categories.json")||[];
   document.getElementById("catList").innerHTML=CATS.map(c=>'<div class="rec"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join("");
 }
 async function addCategory(){await guard(async()=>{
-  await api("/categories","POST",{name:document.getElementById("newCatName").value,prefix:document.getElementById("newCatPrefix").value});
-  msg("catMsg","✓ Категория добавлена.",true);CATS=await api("/categories");fillCatSelect();renderCats();
+  const n=document.getElementById("newCatName").value.trim().toUpperCase();
+  const p=document.getElementById("newCatPrefix").value.trim().toUpperCase()||"ЗАП";
+  if(!n)throw new Error("Пустое имя.");
+  if(CATS.some(c=>c.name===n))throw new Error("Уже существует.");
+  CATS.push({name:n,prefix:p});
+  await ghPut("data/categories.json",CATS,"НОВАЯ КАТЕГОРИЯ "+n);
+  await addJournal("НОВАЯ КАТЕГОРИЯ",n);
+  msg("catMsg","✓ Добавлена.",true);fillCatSelect();renderCats();
 },"catMsg");}
+async function addJournal(action,detail){
+  JOURNAL=await ghGet("data/journal.json")||[];
+  JOURNAL.unshift({ts:now(),op:ME?ME.name:"?",action,detail:detail||""});
+  if(JOURNAL.length>500)JOURNAL=JOURNAL.slice(0,500);
+  await ghPut("data/journal.json",JOURNAL,"journal: "+action);
+}
 async function renderJournal(){
   const box=document.getElementById("journalList");
-  try{const j=await api("/journal");
-    box.innerHTML=j.map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join("");
-  }catch(e){box.innerHTML='<p style="color:var(--err)">✖ '+esc(e.message)+'</p>';}
+  if(ME.clearance<4){box.innerHTML='<p style="color:var(--err)">✖ Допуск 4+.</p>';return;}
+  JOURNAL=await ghGet("data/journal.json")||[];
+  box.innerHTML=JOURNAL.slice(0,100).map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join("")||'<p class="meta">Пусто.</p>';
 }
 async function renderCouncil(){
   if(ME.clearance<5)return;
-  const users=await api("/users");
+  USERS=await ghGet("data/users.json")||[];
   const box=document.getElementById("userList");box.innerHTML="";
-  users.forEach(u=>{
+  USERS.forEach(u=>{
     const div=document.createElement("div");div.className="rec";
     div.innerHTML=esc(u.name)+' │ '+esc(u.role)+' │ допуск '+u.clearance+' ';
     const sel=document.createElement("select");sel.style.width="70px";
     [1,2,3,4,5].forEach(n=>{const o=document.createElement("option");o.value=n;o.textContent=n;if(n===u.clearance)o.selected=true;sel.appendChild(o);});
-    sel.onchange=()=>guard(async()=>{await api("/users/"+encodeURIComponent(u.name),"PUT",{clearance:sel.value});},"councilMsg");
+    sel.onchange=()=>guard(async()=>{u.clearance=parseInt(sel.value);await ghPut("data/users.json",USERS,"СМЕНА ДОПУСКА "+u.name);await addJournal("СМЕНА ДОПУСКА",u.name+"→"+sel.value);},"councilMsg");
     div.appendChild(sel);box.appendChild(div);
   });
 }
 async function addUser(){await guard(async()=>{
   const n=document.getElementById("nuName").value.trim(),p=document.getElementById("nuPass").value;
-  if(!n||p.length<8)throw new Error("Имя и ключ (мин. 8 знаков) обязательны.");
-  const salt=randSalt();
-  await api("/users","POST",{name:n,salt,verifier:await makeVerifier(p,salt),
-    role:document.getElementById("nuRole").value,clearance:document.getElementById("nuClear").value});
-  msg("councilMsg","✓ Оператор добавлен. Передай ему ссылку-ключ Голокрона и его имя/пароль.",true);renderCouncil();
+  if(!n||p.length<8)throw new Error("Имя и ключ (мин. 8 знаков).");
+  if(USERS.some(u=>u.name===n))throw new Error("Имя занято.");
+  const salt=randSalt();const v=await makeVerifier(p,salt);
+  USERS.push({name:n,role:document.getElementById("nuRole").value,clearance:parseInt(document.getElementById("nuClear").value),salt,verifier:v,created:now()});
+  await ghPut("data/users.json",USERS,"НОВЫЙ ОПЕРАТОР "+n);
+  await addJournal("НОВЫЙ ОПЕРАТОР",n);
+  msg("councilMsg","✓ Добавлен. Передай ссылку-ключ и имя/пароль.",true);renderCouncil();
 },"councilMsg");}
 async function backup(){await guard(async()=>{
-  const data=await api("/backup");
+  const data={records:RECORDS,categories:CATS,users:USERS,journal:JOURNAL,exported:now()};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json";a.click();
@@ -380,14 +433,26 @@ async function backup(){await guard(async()=>{
 (async()=>{
   D("инициализация КОДЕКСА…");
   try{
-    const st=await withTimeout(fetch("/api/status"),60000,"проверка статуса").then(r=>r.json());
-    D("статус получен, initialized="+st.initialized);
-    if(!st.initialized){document.getElementById("setupBlock").classList.remove("hidden");return;}
-    const ks=sessionStorage.getItem("jedi_key");
-    if(TOKEN&&ME&&ks){VAULT=await importVault(unb64(ks));try{CATS=await api("/categories");await enterMain();return;}catch(e){doLogoutUI();}}
-    document.getElementById("loginBlock").classList.remove("hidden");
-    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка-ключ Голокрона от Магистра (вид …#k=…).",false);
-  }catch(e){D("FAIL init: "+e.message);msg("authMsg","Храм недоступен: "+e.message,false);}
+    const savedToken=sessionStorage.getItem("gh_token");
+    const savedRepo=sessionStorage.getItem("gh_repo");
+    const savedMe=sessionStorage.getItem("jedi_me");
+    const savedKey=sessionStorage.getItem("jedi_key");
+    if(savedToken&&savedRepo&&savedMe&&savedKey){
+      GH_TOKEN=savedToken;GH_REPO=savedRepo;ME=JSON.parse(savedMe);
+      VAULT=await importVault(unb64(savedKey));
+      try{CATS=await ghGet("data/categories.json")||[];await enterMain();return;}catch(e){D("автовход: "+e.message);doLogoutUI();}
+    }
+    if(savedToken&&savedRepo){
+      GH_TOKEN=savedToken;GH_REPO=savedRepo;
+      try{const meta=await ghGet("data/meta.json");
+        if(meta&&meta.initialized){document.getElementById("loginBlock").classList.remove("hidden");}
+        else{document.getElementById("setupBlock").classList.remove("hidden");}
+      }catch(e){document.getElementById("setupBlock").classList.remove("hidden");}
+    }else{
+      document.getElementById("setupBlock").classList.remove("hidden");
+    }
+    if(!location.hash.startsWith("#k="))msg("authMsg","Подсказка: для входа нужна ПОЛНАЯ ссылка …#k=… от Магистра.",false);
+  }catch(e){D("FAIL init: "+e.message);msg("authMsg","Ошибка: "+e.message,false);}
 })();
 </script>
 </body>
