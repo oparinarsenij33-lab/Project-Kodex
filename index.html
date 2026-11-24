@@ -106,8 +106,8 @@ label{font-size:12px;color:var(--dim)}
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <textarea id="edBody" placeholder="Текст досье…"></textarea>
-    <label>Ссылка на фото (загрузи на postimages.org и вставь прямую ссылку):</label>
-    <input id="edImageUrl" placeholder="https://i.postimg.cc/xxxxx.jpg">
+    <label>Ссылка на фото (загрузи на imgbb.com и вставь прямую ссылку):</label>
+    <input id="edImageUrl" placeholder="https://i.ibb.co/XXXXX/filename.jpg">
     <img id="imgPreview" class="img-preview">
     <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
@@ -177,16 +177,6 @@ async function decText(payload){
 function randSalt(){return b64(crypto.getRandomValues(new Uint8Array(16)));}
 function now(){return new Date().toLocaleString("ru-RU");}
 
-/* ─── Proxy helper for images ─── */
-function proxyImage(url){
-  if(!url) return null;
-  // Используем weserv.nl для обхода hotlink protection
-  if(url.includes("postimg.cc") || url.includes("ibb.co")){
-    return "https://images.weserv.nl/?url="+encodeURIComponent(url);
-  }
-  return url;
-}
-
 /* ─── GitHub API helpers ─── */
 async function ghGet(path){
   const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"чтение "+path);
@@ -218,14 +208,14 @@ async function ghList(dir){
   return await r.json();
 }
 
-/* ─── Preview handler for image URL ─── */
+/* ─── Preview handler for ImgBB URL ─── */
 document.getElementById("edImageUrl").addEventListener("input",(e)=>{
   const url=e.target.value.trim();
   const preview=document.getElementById("imgPreview");
   if(url && (url.startsWith("http://") || url.startsWith("https://"))){
-    preview.src=proxyImage(url); // Используем прокси для превью тоже
+    preview.src=url; // ImgBB работает напрямую, без прокси
     preview.style.display="block";
-    preview.onerror=()=>{preview.style.display="none";D("ошибка загрузки превью");};
+    preview.onerror=()=>{preview.style.display="none";D("ошибка загрузки превью (проверь ссылку)");};
   } else {
     preview.style.display="none";
     preview.src="";
@@ -340,14 +330,13 @@ function renderList(){
 }
 async function viewRecord(r){await guard(async()=>{
   const body=await decText(r.body_enc);
-  const imgUrl=proxyImage(r.image_url); // Проксируем изображение
   const vc=document.getElementById("viewContent");vc.innerHTML=
     '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
     '<div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · автор: '+esc(r.author)+' · создано: '+esc(r.created)+' · изменено: '+esc(r.updated)+'</div>'+
     '<div>'+(r.tags||"").split(",").filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join("")+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':"")+
     '<div class="body-text">'+esc(body)+'</div>'+
-    (imgUrl?'<img src="'+esc(imgUrl)+'" class="img-dossier" alt="Фото досье" onerror="this.style.display=\'none\'">':"")+
+    (r.image_url?'<img src="'+esc(r.image_url)+'" class="img-dossier" alt="Фото досье" onerror="this.style.display=\'none\'">':"")+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
   document.getElementById("btnEdit").onclick=()=>openEditor(r);
@@ -378,7 +367,7 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edImageUrl").value=r&&r.image_url?r.image_url:"";
   const preview=document.getElementById("imgPreview");
   if(r&&r.image_url){
-    preview.src=proxyImage(r.image_url); // Проксируем превью при редактировании
+    preview.src=r.image_url; // Прямая ссылка для превью при редактировании
     preview.style.display="block";
   } else {
     preview.style.display="none";
