@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════
-//  КОДЕКС v2 — АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ
+//  КОДЕКС v3 — АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ
 //  Cloudflare Worker + D1. Криптография на клиенте, CPU < 10 мс.
-//  Биндинги: DB (D1), ASSETS (статика). /api/salt уже встроен.
+//  Исправлено: wildcard-запросы заменены на явные колонки (D1 50MB limit fix).
 // ═══════════════════════════════════════════════════════════
 const now = () => new Date().toLocaleString("ru-RU", { timeZone: "Europe/Moscow" });
 const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, "0")).join("");
@@ -36,7 +36,7 @@ export default {
       }
       if (p === "/api/login" && request.method === "POST") {
         const { name, verifier } = await request.json();
-        const u = await env.DB.prepare("SELECT * FROM users WHERE name=?").bind(name || "").first();
+        const u = await env.DB.prepare("SELECT id,name,role,clearance,salt,verifier FROM users WHERE name=?").bind(name || "").first();
         if (!u || u.verifier !== verifier) {
           await log(env, name || "?", "ОТКАЗ ДОСТУПА");
           return json({ error: "Доступ отклонён. Сила не чувствует тебя…" }, 401);
@@ -48,16 +48,16 @@ export default {
         return json({ token, name: u.name, role: u.role, clearance: u.clearance, salt: u.salt });
       }
       const token = request.headers.get("x-token");
-      const s = token && await env.DB.prepare("SELECT * FROM sessions WHERE token=?").bind(token).first();
+      const s = token && await env.DB.prepare("SELECT name,expires FROM sessions WHERE token=?").bind(token).first();
       if (!s || s.expires < Date.now()) return json({ error: "Сеанс истёк. Войдите заново." }, 401);
-      const user = await env.DB.prepare("SELECT * FROM users WHERE name=?").bind(s.name).first();
+      const user = await env.DB.prepare("SELECT name,role,clearance FROM users WHERE name=?").bind(s.name).first();
 
       if (p === "/api/logout" && request.method === "POST") {
         await env.DB.prepare("DELETE FROM sessions WHERE token=?").bind(token).run();
         await log(env, user.name, "ВЫХОД"); return json({ ok: true });
       }
       if (p === "/api/categories" && request.method === "GET")
-        return json((await env.DB.prepare("SELECT * FROM categories ORDER BY name").all()).results);
+        return json((await env.DB.prepare("SELECT name,prefix FROM categories ORDER BY name").all()).results);
       if (p === "/api/categories" && request.method === "POST") {
         const { name, prefix } = await request.json();
         const n = (name || "").toUpperCase().trim(), pr = (prefix || "ЗАП").toUpperCase().slice(0, 3);
@@ -92,13 +92,14 @@ export default {
       const recMatch = p.match(/^\/api\/records\/(\d+)$/);
       if (recMatch) {
         const id = parseInt(recMatch[1]);
-        const r = await env.DB.prepare("SELECT * FROM records WHERE id=?").bind(id).first();
+        const r = await env.DB.prepare("SELECT id,code,clearance FROM records WHERE id=?").bind(id).first();
         if (!r) return json({ error: "Запись не найдена." }, 404);
         if (r.clearance > user.clearance) { await log(env, user.name, "ПОПЫТКА ДОСТУПА", r.code); return json({ error: "Недостаточный допуск." }, 403); }
         if (request.method === "GET") {
           await log(env, user.name, "ЧТЕНИЕ", r.code);
+          const row = await env.DB.prepare("SELECT code,title,category,clearance,tags,body_enc,source,author,created,updated FROM records WHERE id=?").bind(id).first();
           const files = await env.DB.prepare("SELECT id,filename,size,sha256 FROM attachments WHERE record_id=?").bind(id).all();
-          return json({ ...r, files: files.results });
+          return json({ ...row, files: files.results });
         }
         if (request.method === "PUT") {
           const { title, category, clearance, tags, source, body_enc } = await request.json();
@@ -117,7 +118,7 @@ export default {
       const upMatch = p.match(/^\/api\/records\/(\d+)\/files$/);
       if (upMatch && request.method === "POST") {
         const id = parseInt(upMatch[1]);
-        const r = await env.DB.prepare("SELECT * FROM records WHERE id=?").bind(id).first();
+        const r = await env.DB.prepare("SELECT id,code,clearance FROM records WHERE id=?").bind(id).first();
         if (!r) return json({ error: "Запись не найдена." }, 404);
         if (r.clearance > user.clearance) return json({ error: "Недостаточный допуск." }, 403);
         const form = await request.formData();
@@ -137,7 +138,7 @@ export default {
       }
       const fileMatch = p.match(/^\/api\/files\/(\d+)(\/check)?$/);
       if (fileMatch) {
-        const a = await env.DB.prepare("SELECT a.*, r.clearance, r.code FROM attachments a JOIN records r ON r.id=a.record_id WHERE a.id=?")
+        const a = await env.DB.prepare("SELECT a.id,a.filename,a.size,a.sha256,a.data,r.clearance,r.code FROM attachments a JOIN records r ON r.id=a.record_id WHERE a.id=?")
           .bind(parseInt(fileMatch[1])).first();
         if (!a) return json({ error: "Файл не найден." }, 404);
         if (a.clearance > user.clearance) return json({ error: "Недостаточный допуск." }, 403);
@@ -154,7 +155,7 @@ export default {
       }
       if (p === "/api/journal") {
         if (user.clearance < 4) return json({ error: "Журнал доступен с допуска 4." }, 403);
-        return json((await env.DB.prepare("SELECT * FROM journal ORDER BY id DESC LIMIT 200").all()).results);
+        return json((await env.DB.prepare("SELECT ts,op,action,detail FROM journal ORDER BY id DESC LIMIT 200").all()).results);
       }
       if (p === "/api/users" && request.method === "GET") {
         if (user.clearance < 5) return json({ error: "Только Совет." }, 403);
@@ -181,8 +182,8 @@ export default {
       if (p === "/api/backup") {
         if (user.clearance < 5) return json({ error: "Только Магистр." }, 403);
         const data = {
-          records: (await env.DB.prepare("SELECT * FROM records").all()).results,
-          categories: (await env.DB.prepare("SELECT * FROM categories").all()).results,
+          records: (await env.DB.prepare("SELECT id,code,title,category,clearance,tags,source,author,created,updated FROM records").all()).results,
+          categories: (await env.DB.prepare("SELECT name,prefix FROM categories").all()).results,
           exported: now()
         };
         await log(env, user.name, "РЕЗЕРВНАЯ КОПИЯ"); return json(data);
