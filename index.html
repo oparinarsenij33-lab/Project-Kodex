@@ -41,6 +41,16 @@ label{font-size:12px;color:var(--dim)}
 #diag b{color:var(--holo2)}
 .img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
 .img-dossier{max-width:100%;border-radius:4px;border:1px solid var(--dim);margin-top:10px;display:block}
+
+/* Rich Text Editor Styles */
+.editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:6px;background:#03101f;border:1px solid var(--dim);border-radius:4px}
+.editor-toolbar button{padding:6px 10px;font-size:13px;margin:0}
+.editor-content{min-height:200px;background:#03101f;border:1px solid var(--dim);border-radius:4px;padding:10px;color:var(--holo2);font-family:inherit;font-size:15px;line-height:1.5;outline:none;overflow-y:auto}
+.editor-content:focus{border-color:var(--holo);box-shadow:0 0 8px rgba(79,195,247,.4)}
+.editor-content h1,.editor-content h2,.editor-content h3{color:var(--holo);margin:10px 0 5px}
+.editor-content blockquote{border-left:3px solid var(--dim);padding-left:10px;color:var(--dim);margin:8px 0}
+.editor-content ul,.editor-content ol{padding-left:20px;margin:8px 0}
+.editor-content img{max-width:100%;border-radius:4px}
 </style>
 </head>
 <body>
@@ -48,6 +58,7 @@ label{font-size:12px;color:var(--dim)}
 <h1 class="glow">⟡ К О Д Е К С ⟡</h1>
 <div class="sub">АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ · «Знание — свет. Свет — Сила.»</div>
 
+<!-- AUTH SCREEN -->
 <div id="authScreen" class="panel">
   <div id="setupBlock" class="hidden">
     <p style="color:var(--warn)">═══ ПЕРВОЕ ПРОБУЖДЕНИЕ АРХИВА ═══</p>
@@ -55,10 +66,12 @@ label{font-size:12px;color:var(--dim)}
     <input id="setupName" placeholder="Имя Магистра" autocomplete="off">
     <input id="setupPass" type="password" placeholder="Ключ доступа (пароль, мин. 8 знаков)">
     <input id="setupPass2" type="password" placeholder="Повторите ключ">
+    <!-- Hidden fields for Master setup only -->
     <input id="setupToken" type="password" placeholder="GitHub Token (fine-grained, Contents read/write)">
     <input id="setupRepo" placeholder="owner/repo (например: oparinarsenij33-lab/Project-Kodex)">
     <button onclick="setup()">СОЗДАТЬ МАГИСТРА</button>
   </div>
+  
   <div id="loginBlock" class="hidden">
     <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
     <input id="loginName" placeholder="Имя оператора" autocomplete="off">
@@ -68,6 +81,7 @@ label{font-size:12px;color:var(--dim)}
   <div id="authMsg" class="msg"></div>
 </div>
 
+<!-- MAIN SCREEN -->
 <div id="mainScreen" class="hidden">
   <div class="topbar">
     <span>Приветствую, оператор <b id="uName"></b> · <span id="uRole"></span> · допуск <span id="uClear"></span></span>
@@ -92,23 +106,46 @@ label{font-size:12px;color:var(--dim)}
     <div id="viewContent"></div>
   </div>
 
+  <!-- EDITOR WITH RICH TEXT -->
   <div id="tab-editor" class="panel hidden">
     <p id="editorTitle">─── НОВАЯ ЗАПИСЬ ───</p>
     <input id="edTitle" placeholder="Название записи">
     <div class="row">
       <select id="edCat"></select>
       <select id="edClear">
-        <option value="1">Допуск 1 — Падаван</option><option value="2">Допуск 2 — Рыцарь</option>
-        <option value="3" selected>Допуск 3 — Мастер</option><option value="4">Допуск 4 — Совет</option>
+        <option value="1">Допуск 1 — Падаван</option>
+        <option value="2">Допуск 2 — Рыцарь</option>
+        <option value="3" selected>Допуск 3 — Мастер</option>
+        <option value="4">Допуск 4 — Совет</option>
         <option value="5">Допуск 5 — Магистр</option>
       </select>
     </div>
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
-    <textarea id="edBody" placeholder="Текст досье…"></textarea>
-    <label>Ссылка на фото (загрузи на imgbb.com и вставь прямую ссылку):</label>
+    
+    <!-- Rich Text Toolbar -->
+    <label>Текст досье:</label>
+    <div class="editor-toolbar">
+      <button onclick="execCmd('bold')" title="Жирный"><b>B</b></button>
+      <button onclick="execCmd('italic')" title="Курсив"><i>I</i></button>
+      <button onclick="execCmd('underline')" title="Подчёркнутый"><u>U</u></button>
+      <button onclick="execCmd('strikeThrough')" title="Зачёркнутый"><s>S</s></button>
+      <button onclick="execCmd('formatBlock','H2')" title="Заголовок">H2</button>
+      <button onclick="execCmd('formatBlock','H3')" title="Подзаголовок">H3</button>
+      <button onclick="execCmd('formatBlock','P')" title="Обычный текст">¶</button>
+      <button onclick="execCmd('insertUnorderedList')" title="Маркированный список">• List</button>
+      <button onclick="execCmd('insertOrderedList')" title="Нумерованный список">1. List</button>
+      <button onclick="execCmd('formatBlock','BLOCKQUOTE')" title="Цитата">❝ Quote</button>
+      <button onclick="execCmd('justifyLeft')" title="По левому краю">⫷</button>
+      <button onclick="execCmd('justifyCenter')" title="По центру">⫿</button>
+      <button onclick="execCmd('justifyRight')" title="По правому краю">⫸</button>
+    </div>
+    <div id="edBody" class="editor-content" contenteditable="true"></div>
+    
+    <label>Ссылка на фото (imgbb.com):</label>
     <input id="edImageUrl" placeholder="https://i.ibb.co/XXXXX/filename.jpg">
     <img id="imgPreview" class="img-preview">
+    
     <button onclick="saveRecord()">💾 СОХРАНИТЬ В АРХИВ</button>
     <button onclick="showTab('list')">ОТМЕНА</button>
     <div id="edMsg" class="msg"></div>
@@ -143,28 +180,38 @@ label{font-size:12px;color:var(--dim)}
 <script>
 var _b=document.createElement("div");_b.textContent="BOOT OK — скрипт жив";document.getElementById("diag").appendChild(_b);
 "use strict";
-let GH_TOKEN=sessionStorage.getItem("gh_token")||localStorage.getItem("gh_token")||null;
-let GH_REPO=sessionStorage.getItem("gh_repo")||localStorage.getItem("gh_repo")||null;
-let ME=JSON.parse(sessionStorage.getItem("jedi_me")||"null");
-let VAULT=null, RECORDS=[], CATS=[], USERS=[], JOURNAL=[], editingId=null;
-const te=new TextEncoder(), td=new TextDecoder();
+
+// CONFIGURATION FOR ORDINARY USERS
+// Master sets this once during setup. Ordinary users never see tokens.
+let GH_TOKEN = localStorage.getItem("gh_token") || null; 
+let GH_REPO = localStorage.getItem("gh_repo") || null;
+
+let ME = JSON.parse(sessionStorage.getItem("jedi_me") || "null");
+let VAULT = null, RECORDS = [], CATS = [], USERS = [], JOURNAL = [], editingId = null;
+
+const te = new TextEncoder(), td = new TextDecoder();
+
 function b64(buf){const a=new Uint8Array(buf);let s="";for(let i=0;i<a.length;i+=8192)s+=String.fromCharCode(...a.subarray(i,i+8192));return btoa(s);}
 function unb64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0));}
 function esc(s){const d=document.createElement("div");d.textContent=s==null?"":String(s);return d.innerHTML;}
 function msg(id,t,ok){const el=document.getElementById(id);el.textContent=t;el.className="msg "+(ok?"ok":"err");setTimeout(()=>el.className="msg",8000);}
 function D(t){const el=document.getElementById("diag");if(!el)return;const d=document.createElement("div");d.textContent=new Date().toLocaleTimeString()+" › "+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log("[КОДЕКС]",t);}
+
 let lockN=0,lockT=0;
 function busy(on){lockN=Math.max(0,lockN+(on?1:-1));lockT=Date.now();const d=lockN>0;document.querySelectorAll("#authScreen button, #mainScreen button").forEach(b=>b.disabled=d);}
 setInterval(function(){if(lockN>0&&Date.now()-lockT>70000){lockN=0;busy(false);D("страховка: кнопки разблокированы");}},5000);
+
 function withTimeout(promise,ms,label){
   return Promise.race([promise,new Promise((_,rej)=>setTimeout(()=>rej(new Error(label+": таймаут "+ms+"мс")),ms))]);
 }
+
 async function derive(pass,salt){
   const km=await crypto.subtle.importKey("raw",te.encode(pass),"PBKDF2",false,["deriveBits"]);
   return new Uint8Array(await crypto.subtle.deriveBits({name:"PBKDF2",salt:unb64(salt),iterations:250000,hash:"SHA-256"},km,256));
 }
 async function makeVerifier(pass,salt){return b64(await derive(pass+"::auth",salt));}
 async function importVault(raw){return crypto.subtle.importKey("raw",raw,"AES-GCM",false,["encrypt","decrypt"]);}
+
 async function encText(text){
   const iv=crypto.getRandomValues(new Uint8Array(12));
   return b64(iv)+":"+b64(await crypto.subtle.encrypt({name:"AES-GCM",iv},VAULT,te.encode(text)));
@@ -174,11 +221,13 @@ async function decText(payload){
     return td.decode(await crypto.subtle.decrypt({name:"AES-GCM",iv:unb64(iv)},VAULT,unb64(ct)));
   }catch(e){return "[ОШИБКА РАСШИФРОВКИ — неверный ключ Голокрона]";}
 }
+
 function randSalt(){return b64(crypto.getRandomValues(new Uint8Array(16)));}
 function now(){return new Date().toLocaleString("ru-RU");}
 
 /* ─── GitHub API helpers ─── */
 async function ghGet(path){
+  if(!GH_TOKEN || !GH_REPO) throw new Error("Архив не настроен. Обратитесь к Магистру.");
   const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"чтение "+path);
   if(r.status===404)return null;
   if(!r.ok)throw new Error("GitHub GET "+path+": "+r.status);
@@ -186,6 +235,7 @@ async function ghGet(path){
   return JSON.parse(td.decode(unb64(j.content.replace(/\n/g,""))));
 }
 async function ghPut(path,data,message){
+  if(!GH_TOKEN || !GH_REPO) throw new Error("Архив не настроен. Обратитесь к Магистру.");
   let sha=null;
   try{const existing=await fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}});
     if(existing.ok){const ej=await existing.json();sha=ej.sha;}}catch(e){}
@@ -196,12 +246,14 @@ async function ghPut(path,data,message){
   return await r.json();
 }
 async function ghDelete(path,message){
+  if(!GH_TOKEN || !GH_REPO) return;
   const existing=await fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}});
   if(!existing.ok)return;
   const ej=await existing.json();
   await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{method:"DELETE",headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json","Content-Type":"application/json"},body:JSON.stringify({message:message||"delete "+path,sha:ej.sha})}),30000,"удаление "+path);
 }
 async function ghList(dir){
+  if(!GH_TOKEN || !GH_REPO) return [];
   const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+dir,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"листинг "+dir);
   if(r.status===404)return[];
   if(!r.ok)throw new Error("GitHub LIST "+dir+": "+r.status);
@@ -213,7 +265,7 @@ document.getElementById("edImageUrl").addEventListener("input",(e)=>{
   const url=e.target.value.trim();
   const preview=document.getElementById("imgPreview");
   if(url && (url.startsWith("http://") || url.startsWith("https://"))){
-    preview.src=url; // ImgBB работает напрямую, без прокси
+    preview.src=url;
     preview.style.display="block";
     preview.onerror=()=>{preview.style.display="none";D("ошибка загрузки превью (проверь ссылку)");};
   } else {
@@ -221,6 +273,12 @@ document.getElementById("edImageUrl").addEventListener("input",(e)=>{
     preview.src="";
   }
 });
+
+/* ─── Rich Text Editor Commands ─── */
+function execCmd(command, value=null){
+  document.execCommand(command, false, value);
+  document.getElementById("edBody").focus();
+}
 
 async function guard(fn,errTarget,lock){
   const L=lock!==false;
@@ -237,19 +295,28 @@ async function setup(){await guard(async()=>{
   const repo=document.getElementById("setupRepo").value.trim();
   if(!p||p!==p2||p.length<8)throw new Error("Ключи пусты, не совпадают или короче 8 знаков.");
   if(!token||!repo)throw new Error("Нужны GitHub Token и owner/repo.");
-  GH_TOKEN=token;GH_REPO=repo;
-  localStorage.setItem("gh_token",token);localStorage.setItem("gh_repo",repo);
-  sessionStorage.setItem("gh_token",token);sessionStorage.setItem("gh_repo",repo);
+  
+  // Save credentials permanently for all users on this device/browser
+  GH_TOKEN=token; GH_REPO=repo;
+  localStorage.setItem("gh_token",token); 
+  localStorage.setItem("gh_repo",repo);
+  sessionStorage.setItem("gh_token",token); 
+  sessionStorage.setItem("gh_repo",repo);
+  
   const salt=randSalt();
   D("деривация пароля…");const v=await makeVerifier(p,salt);
   const raw=crypto.getRandomValues(new Uint8Array(32));
   VAULT=await importVault(raw);
+  
+  // Generate Holocron Key for encryption
   const link=location.origin+location.pathname+"#k="+b64(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+  
   const user={name:n,role:"МАГИСТР",clearance:5,salt,verifier:v,created:now()};
   await ghPut("data/users.json",[user],"ПЕРВОЕ ПРОБУЖДЕНИЕ: Магистр "+n);
   await ghPut("data/categories.json",[{name:"ДОСЬЕ",prefix:"ДОС"},{name:"АНОМАЛИЯ",prefix:"АНО"},{name:"АРТЕФАКТ",prefix:"АРТ"},{name:"ПРОТОКОЛ",prefix:"ПРТ"},{name:"ЛОКАЦИЯ",prefix:"ЛОК"},{name:"ЗНАНИЕ",prefix:"ЗНН"}],"init categories");
   await ghPut("data/journal.json",[],"init journal");
   await ghPut("data/meta.json",{initialized:true},"init meta");
+  
   document.getElementById("setupBlock").classList.add("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
   msg("authMsg","✓ Магистр создан! Сохрани ссылку-ключ Голокрона.",true);
@@ -259,40 +326,55 @@ async function setup(){await guard(async()=>{
 async function login(){await guard(async()=>{
   const nm=document.getElementById("loginName").value.trim(),p=document.getElementById("loginPass").value;
   if(!nm)throw new Error("Введи имя оператора.");
-  if(!GH_TOKEN||!GH_REPO)throw new Error("Нет токена GitHub. Войдите как Магистр или обновите токен.");
+  if(!GH_TOKEN||!GH_REPO)throw new Error("Архив не настроен. Обратитесь к Магистру.");
+  
   D("загрузка пользователей…");
   USERS=await ghGet("data/users.json")||[];
   const u=USERS.find(x=>x.name===nm);
   if(!u)throw new Error("Оператор «"+nm+"» не найден.");
+  
   D("деривация пароля…");const v=await makeVerifier(p,u.salt);
   if(v!==u.verifier)throw new Error("Неверный ключ доступа.");
+  
+  // Get Vault Key from URL hash (Holocron Key)
   const hash=location.hash;
   if(!hash.startsWith("#k="))throw new Error("Нет ключа Голокрона в адресе! Нужна полная ссылка …#k=…");
   let ks=hash.slice(3).replace(/-/g,"+").replace(/_/g,"/");while(ks.length%4)ks+="=";
   VAULT=await importVault(unb64(ks));
-  ME=u;sessionStorage.setItem("jedi_me",JSON.stringify(ME));sessionStorage.setItem("jedi_key",ks);
+  
+  ME=u;
+  sessionStorage.setItem("jedi_me",JSON.stringify(ME));
+  sessionStorage.setItem("jedi_key",ks);
+  
   D("вход выполнен");
   await enterMain();
 },"authMsg");}
 
 async function logout(){doLogoutUI();}
 function doLogoutUI(){
-  GH_TOKEN=null;GH_REPO=null;ME=null;VAULT=null;sessionStorage.clear();lockN=0;busy(false);
+  ME=null; VAULT=null; sessionStorage.clear(); lockN=0; busy(false);
   document.getElementById("mainScreen").classList.add("hidden");
   document.getElementById("authScreen").classList.remove("hidden");
   document.getElementById("loginBlock").classList.remove("hidden");
   document.getElementById("loginPass").value="";
 }
+
 async function enterMain(){
   document.getElementById("authScreen").classList.add("hidden");
   document.getElementById("mainScreen").classList.remove("hidden");
   document.getElementById("uName").textContent=ME.name;
   document.getElementById("uRole").textContent=ME.role;
   document.getElementById("uClear").textContent=ME.clearance;
+  
+  // Show Council/Backup only for high clearance
   document.getElementById("councilBtn").style.display=ME.clearance>=5?"":"none";
   document.getElementById("backupBtn").style.display=ME.clearance>=5?"":"none";
-  CATS=await ghGet("data/categories.json")||[];fillCatSelect();showTab("list");
+  
+  CATS=await ghGet("data/categories.json")||[];
+  fillCatSelect();
+  showTab("list");
 }
+
 const TABS=["list","view","editor","cats","journal","council"];
 function showTabRaw(t){TABS.forEach(x=>document.getElementById("tab-"+x).classList.toggle("hidden",x!==t));}
 function showTab(t){
@@ -302,6 +384,7 @@ function showTab(t){
   if(t==="journal")guard(renderJournal,null,false);
   if(t==="council")guard(renderCouncil,null,false);
 }
+
 async function loadRecords(){
   D("загрузка записей…");
   const files=await ghList("data/records");
@@ -313,36 +396,48 @@ async function loadRecords(){
   RECORDS.sort((a,b)=>(b.id||0)-(a.id||0));
   renderList();D("загружено: "+RECORDS.length);
 }
+
 function renderList(){
   const q=(document.getElementById("searchBox").value||"").toLowerCase();
   const box=document.getElementById("recList");box.innerHTML="";let shown=0;
   for(const r of RECORDS){
-    if(r.clearance>ME.clearance){if(q)continue;
+    // CHECK CLEARANCE LEVEL
+    if(r.clearance > ME.clearance){
+      if(q) continue; // Don't show locked items in search unless found
       const div=document.createElement("div");div.className="rec";
-      div.innerHTML='<span class="locked">▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — допуск '+r.clearance+']</span>';
-      box.appendChild(div);shown++;continue;}
+      div.innerHTML='<span class="locked">▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — требуется допуск '+r.clearance+']</span>';
+      box.appendChild(div);shown++;continue;
+    }
+    
     if(q&&!((r.title||"")+(r.tags||"")+r.code+(r.category||"")+(r.source||"")).toLowerCase().includes(q))continue;
+    
     const div=document.createElement("div");div.className="rec";
     div.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · '+esc(r.updated)+'</div>';
     div.onclick=()=>viewRecord(r);box.appendChild(div);shown++;
   }
   if(!shown)box.innerHTML='<p class="meta">Архив молчит… записей не найдено.</p>';
 }
+
 async function viewRecord(r){await guard(async()=>{
   const body=await decText(r.body_enc);
-  const vc=document.getElementById("viewContent");vc.innerHTML=
+  const vc=document.getElementById("viewContent");
+  
+  // Render HTML content safely
+  vc.innerHTML=
     '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
     '<div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · автор: '+esc(r.author)+' · создано: '+esc(r.created)+' · изменено: '+esc(r.updated)+'</div>'+
     '<div>'+(r.tags||"").split(",").filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join("")+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':"")+
-    '<div class="body-text">'+esc(body)+'</div>'+
+    '<div class="body-text" style="white-space:normal">'+body+'</div>'+ // Allow HTML rendering
     (r.image_url?'<img src="'+esc(r.image_url)+'" class="img-dossier" alt="Фото досье" onerror="this.style.display=\'none\'">':"")+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
+    
   document.getElementById("btnEdit").onclick=()=>openEditor(r);
   const bd=document.getElementById("btnDel");if(bd)bd.onclick=()=>deleteRecord(r);
   showTabRaw("view");
 });}
+
 async function deleteRecord(r){
   if(!confirm("Удалить "+r.code+" навсегда?"))return;
   await guard(async()=>{
@@ -351,10 +446,12 @@ async function deleteRecord(r){
     showTab("list");
   });
 }
+
 function fillCatSelect(){
   const s=document.getElementById("edCat");s.innerHTML="";
   CATS.forEach(c=>{const o=document.createElement("option");o.value=c.name;o.textContent=c.name;s.appendChild(o);});
 }
+
 async function openEditor(r){await guard(async()=>{
   editingId=r||null;
   document.getElementById("editorTitle").textContent=r?"─── РЕДАКТИРОВАНИЕ "+r.code+" ───":"─── НОВАЯ ЗАПИСЬ ───";
@@ -363,11 +460,20 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edClear").value=r?r.clearance:Math.min(3,ME.clearance);
   document.getElementById("edTags").value=r?r.tags:"";
   document.getElementById("edSource").value=r?r.source:"";
-  document.getElementById("edBody").value=r?await decText(r.body_enc):"";
+  
+  // Load Rich Text Content
+  const bodyDiv = document.getElementById("edBody");
+  if(r){
+    const decrypted = await decText(r.body_enc);
+    bodyDiv.innerHTML = decrypted; // Set HTML content directly
+  } else {
+    bodyDiv.innerHTML = "";
+  }
+  
   document.getElementById("edImageUrl").value=r&&r.image_url?r.image_url:"";
   const preview=document.getElementById("imgPreview");
   if(r&&r.image_url){
-    preview.src=r.image_url; // Прямая ссылка для превью при редактировании
+    preview.src=r.image_url;
     preview.style.display="block";
   } else {
     preview.style.display="none";
@@ -375,15 +481,20 @@ async function openEditor(r){await guard(async()=>{
   }
   showTabRaw("editor");
 },"edMsg");}
+
 async function saveRecord(){await guard(async()=>{
   const title=document.getElementById("edTitle").value.trim();
   if(!title)throw new Error("Пустое название.");
+  
   D("шифрование…");
   const cat=document.getElementById("edCat").value;
   const cl=parseInt(document.getElementById("edClear").value);
   const tags=document.getElementById("edTags").value.trim();
   const source=document.getElementById("edSource").value.trim();
-  const body_enc=await encText(document.getElementById("edBody").value);
+  
+  // Get HTML content from rich text editor
+  const htmlContent = document.getElementById("edBody").innerHTML;
+  const body_enc=await encText(htmlContent);
   
   let image_url=document.getElementById("edImageUrl").value.trim()||null;
   if(image_url && !(image_url.startsWith("http://") || image_url.startsWith("https://"))){
@@ -396,12 +507,14 @@ async function saveRecord(){await guard(async()=>{
     const c=CATS.find(x=>x.name===cat);const pr=c?c.prefix:"ЗАП";
     id=Date.now();code=pr+"-"+String(id).slice(-4);
   }
+  
   const rec={id,code,title,category:cat,clearance:cl,tags,source,body_enc,image_url:image_url||null,author:ME.name,created:editingId?editingId.created:now(),updated:now()};
   await ghPut("data/records/"+code+".json",rec,(editingId?"РЕДАКТИРОВАНИЕ ":"СОЗДАНИЕ ")+code);
   await addJournal(editingId?"РЕДАКТИРОВАНИЕ":"СОЗДАНИЕ",code);
   msg("edMsg","✓ Запись "+code+" сохранена.",true);
   setTimeout(()=>viewRecord(rec),400);
 },"edMsg");}
+
 async function renderCats(){
   CATS=await ghGet("data/categories.json")||[];
   document.getElementById("catList").innerHTML=CATS.map(c=>'<div class="rec"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join("");
@@ -416,18 +529,21 @@ async function addCategory(){await guard(async()=>{
   await addJournal("НОВАЯ КАТЕГОРИЯ",n);
   msg("catMsg","✓ Добавлена.",true);fillCatSelect();renderCats();
 },"catMsg");}
+
 async function addJournal(action,detail){
   JOURNAL=await ghGet("data/journal.json")||[];
   JOURNAL.unshift({ts:now(),op:ME?ME.name:"?",action,detail:detail||""});
   if(JOURNAL.length>500)JOURNAL=JOURNAL.slice(0,500);
   await ghPut("data/journal.json",JOURNAL,"journal: "+action);
 }
+
 async function renderJournal(){
   const box=document.getElementById("journalList");
   if(ME.clearance<4){box.innerHTML='<p style="color:var(--err)">✖ Допуск 4+.</p>';return;}
   JOURNAL=await ghGet("data/journal.json")||[];
   box.innerHTML=JOURNAL.slice(0,100).map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join("")||'<p class="meta">Пусто.</p>';
 }
+
 async function renderCouncil(){
   if(ME.clearance<5)return;
   USERS=await ghGet("data/users.json")||[];
@@ -441,6 +557,7 @@ async function renderCouncil(){
     div.appendChild(sel);box.appendChild(div);
   });
 }
+
 async function addUser(){await guard(async()=>{
   const n=document.getElementById("nuName").value.trim(),p=document.getElementById("nuPass").value;
   if(!n||p.length<8)throw new Error("Имя и ключ (мин. 8 знаков).");
@@ -451,20 +568,24 @@ async function addUser(){await guard(async()=>{
   await addJournal("НОВЫЙ ОПЕРАТОР",n);
   msg("councilMsg","✓ Добавлен. Передай ссылку-ключ и имя/пароль.",true);renderCouncil();
 },"councilMsg");}
+
 async function backup(){await guard(async()=>{
   const data={records:RECORDS,categories:CATS,users:USERS,journal:JOURNAL,exported:now()};
   const blob=new Blob([JSON.stringify(data)],{type:"application/json"});
   const a=document.createElement("a");a.href=URL.createObjectURL(blob);
   a.download="archive_backup_"+new Date().toISOString().slice(0,10)+".json";a.click();
 });}
+
 (async()=>{
   D("инициализация КОДЕКСА…");
   try{
+    // Check for saved credentials first
     const savedToken=sessionStorage.getItem("gh_token")||localStorage.getItem("gh_token");
     const savedRepo=sessionStorage.getItem("gh_repo")||localStorage.getItem("gh_repo");
     const savedMe=sessionStorage.getItem("jedi_me");
     const savedKey=sessionStorage.getItem("jedi_key");
     
+    // Auto-login if session exists
     if(savedToken&&savedRepo&&savedMe&&savedKey){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;ME=JSON.parse(savedMe);
       VAULT=await importVault(unb64(savedKey));
@@ -472,10 +593,12 @@ async function backup(){await guard(async()=>{
       catch(e){D("автовход: "+e.message);doLogoutUI();}
     }
     
+    // If credentials exist but no session -> show simple login
     if(savedToken&&savedRepo){
       GH_TOKEN=savedToken;GH_REPO=savedRepo;
       document.getElementById("loginBlock").classList.remove("hidden");
     } else {
+      // No credentials -> show Master setup
       document.getElementById("setupBlock").classList.remove("hidden");
     }
     
