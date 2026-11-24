@@ -40,6 +40,7 @@ label{font-size:12px;color:var(--dim)}
 #diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:130px;overflow:auto;background:#03101f;border:1px solid var(--dim);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--dim);z-index:100}
 #diag b{color:var(--holo2)}
 .img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
+.img-dossier{max-width:100%;border-radius:4px;border:1px solid var(--dim);margin-top:10px;display:block}
 </style>
 </head>
 <body>
@@ -176,6 +177,16 @@ async function decText(payload){
 function randSalt(){return b64(crypto.getRandomValues(new Uint8Array(16)));}
 function now(){return new Date().toLocaleString("ru-RU");}
 
+/* ─── Proxy helper for images ─── */
+function proxyImage(url){
+  if(!url) return null;
+  // Используем weserv.nl для обхода hotlink protection
+  if(url.includes("postimg.cc") || url.includes("ibb.co")){
+    return "https://images.weserv.nl/?url="+encodeURIComponent(url);
+  }
+  return url;
+}
+
 /* ─── GitHub API helpers ─── */
 async function ghGet(path){
   const r=await withTimeout(fetch("https://api.github.com/repos/"+GH_REPO+"/contents/"+path,{headers:{Authorization:"Bearer "+GH_TOKEN,Accept:"application/vnd.github.v3+json"}}),30000,"чтение "+path);
@@ -212,9 +223,9 @@ document.getElementById("edImageUrl").addEventListener("input",(e)=>{
   const url=e.target.value.trim();
   const preview=document.getElementById("imgPreview");
   if(url && (url.startsWith("http://") || url.startsWith("https://"))){
-    preview.src=url;
+    preview.src=proxyImage(url); // Используем прокси для превью тоже
     preview.style.display="block";
-    preview.onerror=()=>{preview.style.display="none";};
+    preview.onerror=()=>{preview.style.display="none";D("ошибка загрузки превью");};
   } else {
     preview.style.display="none";
     preview.src="";
@@ -329,13 +340,14 @@ function renderList(){
 }
 async function viewRecord(r){await guard(async()=>{
   const body=await decText(r.body_enc);
+  const imgUrl=proxyImage(r.image_url); // Проксируем изображение
   const vc=document.getElementById("viewContent");vc.innerHTML=
     '<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
     '<div class="meta">'+esc(r.category)+' · допуск '+r.clearance+' · автор: '+esc(r.author)+' · создано: '+esc(r.created)+' · изменено: '+esc(r.updated)+'</div>'+
     '<div>'+(r.tags||"").split(",").filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join("")+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':"")+
     '<div class="body-text">'+esc(body)+'</div>'+
-    (r.image_url?'<div style="margin-top:10px"><img src="'+esc(r.image_url)+'" style="max-width:100%;border-radius:4px;border:1px solid var(--dim)"></div>':"")+
+    (imgUrl?'<img src="'+esc(imgUrl)+'" class="img-dossier" alt="Фото досье" onerror="this.style.display=\'none\'">':"")+
     '<div style="margin-top:10px"><button id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
     (ME.clearance>=4?'<button class="danger" id="btnDel">✖ УДАЛИТЬ</button>':"")+'</div>';
   document.getElementById("btnEdit").onclick=()=>openEditor(r);
@@ -365,8 +377,13 @@ async function openEditor(r){await guard(async()=>{
   document.getElementById("edBody").value=r?await decText(r.body_enc):"";
   document.getElementById("edImageUrl").value=r&&r.image_url?r.image_url:"";
   const preview=document.getElementById("imgPreview");
-  if(r&&r.image_url){preview.src=r.image_url;preview.style.display="block";}
-  else{preview.style.display="none";preview.src="";}
+  if(r&&r.image_url){
+    preview.src=proxyImage(r.image_url); // Проксируем превью при редактировании
+    preview.style.display="block";
+  } else {
+    preview.style.display="none";
+    preview.src="";
+  }
   showTabRaw("editor");
 },"edMsg");}
 async function saveRecord(){await guard(async()=>{
