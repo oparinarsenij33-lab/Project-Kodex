@@ -17,10 +17,8 @@ h1{text-align:center;font-size:clamp(15px,4vw,26px);letter-spacing:4px;text-shad
 .panel{background:var(--panel);border:1px solid var(--dim);border-radius:6px;padding:16px;margin-bottom:14px;box-shadow:0 0 18px rgba(79,195,247,.12) inset}
 input,textarea,select{width:100%;background:#03101f;border:1px solid var(--dim);color:var(--holo2);font-family:inherit;font-size:15px;padding:10px;border-radius:4px;margin:6px 0}
 input:focus,textarea:focus{outline:none;border-color:var(--holo);box-shadow:0 0 8px rgba(79,195,247,.4)}
-textarea{min-height:140px;resize:vertical}
 button{background:transparent;border:1px solid var(--holo);color:var(--holo);font-family:inherit;font-size:14px;padding:10px 14px;border-radius:4px;cursor:pointer;margin:4px 4px 4px 0;text-shadow:0 0 6px rgba(79,195,247,.6)}
 button:hover{background:rgba(79,195,247,.15);box-shadow:0 0 12px rgba(79,195,247,.5)}
-button:disabled{opacity:.4;cursor:wait}
 button.danger{border-color:var(--err);color:var(--err)}
 .row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
 .msg{padding:10px;border-radius:4px;margin:8px 0;font-size:14px;display:none}
@@ -49,7 +47,6 @@ label{font-size:12px;color:var(--dim)}
 .editor-content h1,.editor-content h2,.editor-content h3{color:var(--holo);margin:10px 0 5px}
 .editor-content blockquote{border-left:3px solid var(--dim);padding-left:10px;color:var(--dim);margin:8px 0}
 .editor-content ul,.editor-content ol{padding-left:20px;margin:8px 0}
-.editor-content img{max-width:100%;border-radius:4px}
 </style>
 </head>
 <body>
@@ -57,26 +54,24 @@ label{font-size:12px;color:var(--dim)}
 <h1 class="glow">⟡ К О Д Е К С ⟡</h1>
 <div class="sub">АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ · «Знание — свет. Свет — Сила.»</div>
 
-<!-- LOGIN SCREEN -->
 <div id="authScreen" class="panel">
   <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
-  <input id="loginPass" type="password" placeholder="PIN-код доступа" onkeydown="if(event.key==='Enter')login()">
+  <input id="loginName" placeholder="Имя оператора" autocomplete="off">
+  <input id="loginPass" type="password" placeholder="PIN-код" onkeydown="if(event.key==='Enter')login()">
   <button onclick="login()">ВОЙТИ В АРХИВ</button>
   <div id="authMsg" class="msg"></div>
 </div>
 
-<!-- MAIN SCREEN -->
 <div id="mainScreen" class="hidden">
-  <div class="topbar">
-    <span>Приветствую, оператор <b>Аранэль Хальдарон</b> · МАГИСТР · допуск 5</span>
-    <span><button onclick="logout()">ВЫХОД</button></span>
-  </div>
+  <div class="topbar"><span id="topInfo"></span><span><button onclick="logout()">ВЫХОД</button></span></div>
   <div class="panel">
     <input id="searchBox" placeholder="🔍 Фильтр: название, тег, код…" oninput="renderList()">
     <div class="row">
       <button onclick="openEditor()">＋ НОВАЯ ЗАПИСЬ</button>
       <button onclick="showTab('list')">АРХИВ</button>
       <button onclick="showTab('cats')">КАТЕГОРИИ</button>
+      <button id="journalBtn" onclick="showTab('journal')">ЖУРНАЛ</button>
+      <button id="councilBtn" onclick="showTab('council')">СОВЕТ</button>
       <button onclick="exportData()">💾 ЭКСПОРТ</button>
       <button onclick="importData()">📂 ИМПОРТ</button>
     </div>
@@ -92,34 +87,31 @@ label{font-size:12px;color:var(--dim)}
   <div id="tab-editor" class="panel hidden">
     <p id="editorTitle">─── НОВАЯ ЗАПИСЬ ───</p>
     <input id="edTitle" placeholder="Название записи">
-    <div class="row">
-      <select id="edCat"></select>
-      <select id="edClear">
-        <option value="1">Допуск 1 — Падаван</option>
-        <option value="2">Допуск 2 — Рыцарь</option>
-        <option value="3" selected>Допуск 3 — Мастер</option>
-        <option value="4">Допуск 4 — Совет</option>
-        <option value="5">Допуск 5 — Магистр</option>
-      </select>
-    </div>
+    <div class="row"><select id="edCat"></select><select id="edClear"></select></div>
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <label>Текст досье:</label>
     <div class="editor-toolbar">
-      <button onclick="execCmd('bold')" title="Жирный"><b>B</b></button>
-      <button onclick="execCmd('italic')" title="Курсив"><i>I</i></button>
-      <button onclick="execCmd('underline')" title="Подчёркнутый"><u>U</u></button>
-      <button onclick="execCmd('formatBlock','H2')" title="Заголовок">H2</button>
-      <button onclick="execCmd('insertUnorderedList')" title="Список">• List</button>
-      <button onclick="execCmd('formatBlock','BLOCKQUOTE')" title="Цитата">❝</button>
-      <button onclick="execCmd('justifyCenter')" title="По центру">⫿</button>
+      <button onclick="execCmd('bold')"><b>B</b></button>
+      <button onclick="execCmd('italic')"><i>I</i></button>
+      <button onclick="execCmd('underline')"><u>U</u></button>
+      <button onclick="execCmd('strikeThrough')"><s>S</s></button>
+      <button onclick="execCmd('formatBlock','H2')">H2</button>
+      <button onclick="execCmd('formatBlock','H3')">H3</button>
+      <button onclick="execCmd('formatBlock','P')">¶</button>
+      <button onclick="execCmd('insertUnorderedList')">• List</button>
+      <button onclick="execCmd('insertOrderedList')">1. List</button>
+      <button onclick="execCmd('formatBlock','BLOCKQUOTE')">❝</button>
+      <button onclick="execCmd('justifyLeft')">⫷</button>
+      <button onclick="execCmd('justifyCenter')">⫿</button>
+      <button onclick="execCmd('justifyRight')">⫸</button>
     </div>
     <div id="edBody" class="editor-content" contenteditable="true"></div>
-    <label>Фото (выбери файл):</label>
+    <label>Фото (файл с устройства):</label>
     <input type="file" id="edFile" accept="image/*">
+    <button onclick="clearPhoto()">УБРАТЬ ФОТО</button>
     <img id="imgPreview" class="img-preview">
-    <button onclick="saveRecord()">💾 СОХРАНИТЬ</button>
-    <button onclick="showTab('list')">ОТМЕНА</button>
+    <div><button onclick="saveRecord()">💾 СОХРАНИТЬ</button><button onclick="showTab('list')">ОТМЕНА</button></div>
     <div id="edMsg" class="msg"></div>
   </div>
 
@@ -129,11 +121,26 @@ label{font-size:12px;color:var(--dim)}
     <button onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
     <div id="catMsg" class="msg"></div>
   </div>
+
+  <div id="tab-journal" class="panel hidden"><p>─── ЖУРНАЛ ДОСТУПА ───</p><div id="journalList"></div></div>
+
+  <div id="tab-council" class="panel hidden">
+    <p>─── СОВЕТ: ОПЕРАТОРЫ И ДОСТУП ───</p>
+    <div id="userList"></div>
+    <p class="meta" style="margin-top:12px">Новый оператор:</p>
+    <input id="nuName" placeholder="Имя">
+    <input id="nuPin" type="password" placeholder="PIN-код (мин. 4 знака)">
+    <div class="row">
+      <select id="nuRole"><option>ПАДАВАН</option><option selected>РЫЦАРЬ</option><option>МАСТЕР</option><option>СОВЕТ</option><option>МАГИСТР</option></select>
+      <select id="nuClear"><option value="1">допуск 1</option><option value="2" selected>допуск 2</option><option value="3">допуск 3</option><option value="4">допуск 4</option><option value="5">допуск 5</option></select>
+    </div>
+    <button onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
+    <div id="councilMsg" class="msg"></div>
+  </div>
 </div>
 <div class="sub">PWA · IndexedDB · Offline-first</div>
 </div>
 <div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b></div>
-
 <script src="app.js"></script>
 </body>
 </html>
