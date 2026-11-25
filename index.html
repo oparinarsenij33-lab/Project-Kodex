@@ -41,12 +41,18 @@ label{font-size:12px;color:var(--dim)}
 .img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
 .img-dossier{max-width:100%;border-radius:4px;border:1px solid var(--dim);margin-top:10px;display:block}
 .editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:6px;background:#03101f;border:1px solid var(--dim);border-radius:4px}
-.editor-toolbar button{padding:6px 10px;font-size:13px;margin:0;min-width:32px}
-.editor-content{min-height:200px;background:#03101f;border:1px solid var(--dim);border-radius:4px;padding:10px;color:var(--holo2);font-family:inherit;font-size:15px;line-height:1.5;outline:none;overflow-y:auto}
+.editor-toolbar button{padding:6px 10px;font-size:13px;margin:0;min-width:34px}
+.editor-toolbar button.active{background:rgba(79,195,247,.28);box-shadow:0 0 10px rgba(79,195,247,.6)}
+.editor-content{min-height:220px;background:#03101f;border:1px solid var(--dim);border-radius:4px;padding:10px;color:var(--holo2);font-family:inherit;font-size:15px;line-height:1.5;outline:none;overflow-y:auto}
 .editor-content:focus{border-color:var(--holo);box-shadow:0 0 8px rgba(79,195,247,.4)}
-.editor-content h1,.editor-content h2,.editor-content h3{color:var(--holo);margin:10px 0 5px}
+.editor-content h1,.editor-content h2,.editor-content h3,.editor-content h4{color:var(--holo);margin:10px 0 5px}
 .editor-content blockquote{border-left:3px solid var(--dim);padding-left:10px;color:var(--dim);margin:8px 0}
-.editor-content ul,.editor-content ol{padding-left:20px;margin:8px 0}
+.editor-content ul,.editor-content ol{padding-left:22px;margin:8px 0}
+.editor-content p{margin:6px 0}
+.body-text h1,.body-text h2,.body-text h3,.body-text h4{color:var(--holo);margin:10px 0 5px}
+.body-text blockquote{border-left:3px solid var(--dim);padding-left:10px;color:var(--dim);margin:8px 0}
+.body-text ul,.body-text ol{padding-left:22px;margin:8px 0}
+.body-text p{margin:6px 0}
 </style>
 </head>
 <body>
@@ -58,29 +64,30 @@ label{font-size:12px;color:var(--dim)}
   <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
   <input id="loginName" placeholder="Имя оператора" autocomplete="off">
   <input id="loginPass" type="password" placeholder="PIN-код" onkeydown="if(event.key==='Enter')login()">
-  <button onclick="login()">ВОЙТИ В АРХИВ</button>
+  <button type="button" onclick="login()">ВОЙТИ В АРХИВ</button>
   <div id="authMsg" class="msg"></div>
 </div>
 
 <div id="mainScreen" class="hidden">
-  <div class="topbar"><span id="topInfo"></span><span><button onclick="logout()">ВЫХОД</button></span></div>
+  <div class="topbar"><span id="topInfo"></span><span><button type="button" onclick="logout()">ВЫХОД</button></span></div>
   <div class="panel">
     <input id="searchBox" placeholder="🔍 Фильтр: название, тег, код…" oninput="renderList()">
     <div class="row">
-      <button onclick="openEditor()">＋ НОВАЯ ЗАПИСЬ</button>
-      <button onclick="showTab('list')">АРХИВ</button>
-      <button onclick="showTab('cats')">КАТЕГОРИИ</button>
-      <button id="journalBtn" onclick="showTab('journal')">ЖУРНАЛ</button>
-      <button id="councilBtn" onclick="showTab('council')">СОВЕТ</button>
-      <button onclick="exportData()">💾 ЭКСПОРТ</button>
-      <button onclick="importData()">📂 ИМПОРТ</button>
+      <button type="button" onclick="openEditor()">＋ НОВАЯ ЗАПИСЬ</button>
+      <button type="button" onclick="showTab('list')">АРХИВ</button>
+      <button type="button" onclick="showTab('cats')">КАТЕГОРИИ</button>
+      <button type="button" id="journalBtn" onclick="showTab('journal')">ЖУРНАЛ</button>
+      <button type="button" id="councilBtn" onclick="showTab('council')">СОВЕТ</button>
+      <button type="button" onclick="exportData()">💾 ЭКСПОРТ</button>
+      <button type="button" onclick="importData()">📂 ИМПОРТ</button>
+      <button type="button" onclick="forceUpdate()">⟳ ОБНОВИТЬ ПРИЛОЖЕНИЕ</button>
     </div>
   </div>
 
   <div id="tab-list" class="panel"><div id="recList"></div></div>
 
   <div id="tab-view" class="panel hidden">
-    <button onclick="showTab('list')">← НАЗАД</button>
+    <button type="button" onclick="showTab('list')">← НАЗАД</button>
     <div id="viewContent"></div>
   </div>
 
@@ -91,34 +98,38 @@ label{font-size:12px;color:var(--dim)}
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <label>Текст досье:</label>
-    <div class="editor-toolbar">
-      <button onclick="execCmd('bold')"><b>B</b></button>
-      <button onclick="execCmd('italic')"><i>I</i></button>
-      <button onclick="execCmd('underline')"><u>U</u></button>
-      <button onclick="execCmd('strikeThrough')"><s>S</s></button>
-      <button onclick="execCmd('formatBlock','H2')">H2</button>
-      <button onclick="execCmd('formatBlock','H3')">H3</button>
-      <button onclick="execCmd('formatBlock','P')">¶</button>
-      <button onclick="execCmd('insertUnorderedList')">• List</button>
-      <button onclick="execCmd('insertOrderedList')">1. List</button>
-      <button onclick="execCmd('formatBlock','BLOCKQUOTE')">❝</button>
-      <button onclick="execCmd('justifyLeft')">⫷</button>
-      <button onclick="execCmd('justifyCenter')">⫿</button>
-      <button onclick="execCmd('justifyRight')">⫸</button>
+    <div class="editor-toolbar" id="edToolbar">
+      <button type="button" data-cmd="bold" title="Жирный"><b>B</b></button>
+      <button type="button" data-cmd="italic" title="Курсив"><i>I</i></button>
+      <button type="button" data-cmd="underline" title="Подчёркнутый"><u>U</u></button>
+      <button type="button" data-cmd="strikeThrough" title="Зачёркнутый"><s>S</s></button>
+      <button type="button" data-block="h2" title="Заголовок">H2</button>
+      <button type="button" data-block="h3" title="Подзаголовок">H3</button>
+      <button type="button" data-block="p" title="Обычный текст">¶</button>
+      <button type="button" data-cmd="insertUnorderedList" title="Маркированный список">• List</button>
+      <button type="button" data-cmd="insertOrderedList" title="Нумерованный список">1. List</button>
+      <button type="button" data-block="blockquote" title="Цитата">❝</button>
+      <button type="button" data-cmd="justifyLeft" title="По левому краю">⫷</button>
+      <button type="button" data-cmd="justifyCenter" title="По центру">⫿</button>
+      <button type="button" data-cmd="justifyRight" title="По правому краю">⫸</button>
+      <button type="button" data-cmd="removeFormat" title="Снять форматирование">✕fmt</button>
     </div>
     <div id="edBody" class="editor-content" contenteditable="true"></div>
     <label>Фото (файл с устройства):</label>
     <input type="file" id="edFile" accept="image/*">
-    <button onclick="clearPhoto()">УБРАТЬ ФОТО</button>
+    <button type="button" onclick="clearPhoto()">УБРАТЬ ФОТО</button>
     <img id="imgPreview" class="img-preview">
-    <div><button onclick="saveRecord()">💾 СОХРАНИТЬ</button><button onclick="showTab('list')">ОТМЕНА</button></div>
+    <div>
+      <button type="button" onclick="saveRecord()">💾 СОХРАНИТЬ</button>
+      <button type="button" onclick="showTab('list')">ОТМЕНА</button>
+    </div>
     <div id="edMsg" class="msg"></div>
   </div>
 
   <div id="tab-cats" class="panel hidden">
     <p>─── КАТЕГОРИИ ───</p><div id="catList"></div>
     <div class="row"><input id="newCatName" placeholder="Новая категория"><input id="newCatPrefix" placeholder="Префикс" maxlength="3"></div>
-    <button onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
+    <button type="button" onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
     <div id="catMsg" class="msg"></div>
   </div>
 
@@ -134,7 +145,7 @@ label{font-size:12px;color:var(--dim)}
       <select id="nuRole"><option>ПАДАВАН</option><option selected>РЫЦАРЬ</option><option>МАСТЕР</option><option>СОВЕТ</option><option>МАГИСТР</option></select>
       <select id="nuClear"><option value="1">допуск 1</option><option value="2" selected>допуск 2</option><option value="3">допуск 3</option><option value="4">допуск 4</option><option value="5">допуск 5</option></select>
     </div>
-    <button onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
+    <button type="button" onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
     <div id="councilMsg" class="msg"></div>
   </div>
 </div>
