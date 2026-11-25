@@ -1,4 +1,4 @@
-// === КОДЕКС PWA · IndexedDB · редактор исправлен ===
+// === КОДЕКС PWA · IndexedDB · редактор v3 ===
 const DB_NAME='KodexDB', DB_VERSION=2;
 let db=null, ME=null, editingId=null, editImage=null, savedRange=null;
 
@@ -30,7 +30,7 @@ async function hashPin(p,salt){
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 async function addJournal(action,detail){try{await put('journal',{id:Date.now()+Math.random(),ts:now(),op:ME?ME.name:'система',action,detail:detail||''});}catch(e){D('журнал: '+e.message);}}
 
-/* ---------- САНИТАЙЗЕР HTML (защита от мусора и скриптов) ---------- */
+/* ---------- САНИТАЙЗЕР ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE','FONT'];
 function cleanNode(node){
   if(node.nodeType===3)return document.createTextNode(node.nodeValue);
@@ -43,42 +43,89 @@ function cleanNode(node){
   const el=document.createElement(tag.toLowerCase());
   const align=node.style&&node.style.textAlign;
   if(align&&['left','center','right','justify'].includes(align))el.style.textAlign=align;
-  if(tag==='FONT'&&node.getAttribute('color')&&/^#[0-9a-f]{3,6}$/i.test(node.getAttribute('color')))el.setAttribute('color',node.getAttribute('color'));
   el.appendChild(kids);
   return el;
 }
 function sanitize(html){
-  const tmp=document.createElement('div');
-  tmp.innerHTML=html||'';
+  const tmp=document.createElement('div');tmp.innerHTML=html||'';
   const out=document.createElement('div');
   tmp.childNodes.forEach(c=>out.appendChild(cleanNode(c)));
   return out.innerHTML;
 }
 
-/* ---------- РЕДАКТОР ТЕКСТА ---------- */
+/* ---------- РЕДАКТОР: ВЫДЕЛЕНИЕ ---------- */
 function bodyEl(){return document.getElementById('edBody');}
+
 function saveRange(){
   const sel=window.getSelection();
-  if(sel&&sel.rangeCount>0){
-    const r=sel.getRangeAt(0);
-    if(bodyEl().contains(r.commonAncestorContainer))savedRange=r.cloneRange();
-  }
+  if(!sel||sel.rangeCount===0)return;
+  const r=sel.getRangeAt(0);
+  if(bodyEl().contains(r.commonAncestorContainer))savedRange=r.cloneRange();
 }
+
+// Главная заплатка: восстанавливаем выделение, а если оно потеряно — берём весь блок
 function restoreRange(){
-  const el=bodyEl();el.focus();
-  if(savedRange){
-    const sel=window.getSelection();
-    sel.removeAllRanges();sel.addRange(savedRange);
+  const el=bodyEl();
+  el.focus();
+  const sel=window.getSelection();
+  if(savedRange && el.contains(savedRange.commonAncestorContainer)){
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+    return;
   }
+  // запасной вариант: выделяем всё содержимое редактора
+  const r=document.createRange();
+  r.selectNodeContents(el);
+  sel.removeAllRanges();
+  sel.addRange(r);
+  savedRange=r.cloneRange();
 }
+
 function execCmd(cmd,val=null){
   restoreRange();
   try{document.execCommand('styleWithCSS',false,false);}catch(e){}
-  const ok=document.execCommand(cmd,false,val);
+  let ok=false;
+  try{ok=document.execCommand(cmd,false,val);}catch(e){D('исключение: '+cmd+' '+e.message);}
+  // если команда не сработала — пробуем ручную обёртку для стилей
+  if(!ok&&['bold','italic','underline','strikeThrough'].includes(cmd)){
+    ok=manualWrap(cmd);
+  }
   saveRange();refreshToolbar();
-  if(!ok)D('команда не выполнена: '+cmd);
+  D((ok?'✓ ':'✗ ')+cmd);
 }
+
+// Ручное применение стиля, когда execCommand бессилен
+function manualWrap(cmd){
+  const sel=window.getSelection();
+  if(!sel||sel.rangeCount===0)return false;
+  const range=sel.getRangeAt(0);
+  if(range.collapsed)return false;
+  const tagMap={bold:'b',italic:'i',underline:'u',strikeThrough:'s'};
+  const tag=tagMap[cmd];
+  const frag=range.extractContents();
+  // если внутри уже есть этот тег — снимаем его (toggle)
+  const already=frag.querySelector&&frag.querySelector(tag);
+  const wrapper=document.createElement(tag);
+  if(already){
+    while(frag.firstChild)wrapper.appendChild(frag.firstChild);
+    const parent=already.parentNode;
+    // упрощённо: просто вставляем без тега
+    const plain=document.createElement('span');
+    plain.innerHTML=frag.textContent;
+    range.insertNode(plain);
+    sel.removeAllRanges();
+    const r=document.createRange();r.selectNodeContents(plain);sel.addRange(r);
+    return true;
+  }
+  wrapper.appendChild(frag);
+  range.insertNode(wrapper);
+  sel.removeAllRanges();
+  const r=document.createRange();r.selectNodeContents(wrapper);sel.addRange(r);
+  return true;
+}
+
 function execBlock(tag){execCmd('formatBlock','<'+tag+'>');}
+
 function refreshToolbar(){
   const tb=document.getElementById('edToolbar');if(!tb)return;
   tb.querySelectorAll('button[data-cmd]').forEach(b=>{
@@ -88,29 +135,42 @@ function refreshToolbar(){
   let blk='';try{blk=(document.queryCommandValue('formatBlock')||'').toLowerCase();}catch(e){}
   tb.querySelectorAll('button[data-block]').forEach(b=>b.classList.toggle('active',blk===b.dataset.block));
 }
+
 function initEditor(){
   const tb=document.getElementById('edToolbar'),el=bodyEl();
   if(!tb||!el)return;
-  // mousedown/touchstart отменяем, чтобы выделение в тексте не терялось
   tb.querySelectorAll('button').forEach(b=>{
     const stop=e=>{e.preventDefault();e.stopPropagation();saveRange();};
     b.addEventListener('mousedown',stop);
     b.addEventListener('touchstart',stop,{passive:false});
+    b.addEventListener('pointerdown',stop);
     b.addEventListener('click',e=>{
       e.preventDefault();e.stopPropagation();
       if(b.dataset.block)execBlock(b.dataset.block);
       else if(b.dataset.cmd)execCmd(b.dataset.cmd);
     });
   });
-  ['keyup','mouseup','input','focus'].forEach(ev=>el.addEventListener(ev,()=>{saveRange();refreshToolbar();}));
+  // сохраняем выделение при любом изменении
+  ['keyup','mouseup','input','focus','touchend','select'].forEach(ev=>el.addEventListener(ev,()=>{saveRange();refreshToolbar();}));
+  document.addEventListener('selectionchange',()=>{
+    const sel=window.getSelection();
+    if(sel&&sel.rangeCount>0&&el.contains(sel.getRangeAt(0).commonAncestorContainer)){saveRange();refreshToolbar();}
+  });
   el.addEventListener('blur',saveRange);
-  // вставка только чистого текста, без чужих стилей
+  // вставка: чистый текст, но с сохранением выделения после вставки
   el.addEventListener('paste',e=>{
     e.preventDefault();
     const txt=(e.clipboardData||window.clipboardData).getData('text/plain');
-    document.execCommand('insertText',false,txt);
+    const html=(e.clipboardData||window.clipboardData).getData('text/html');
+    if(html){
+      document.execCommand('insertHTML',false,sanitize(html));
+    }else{
+      document.execCommand('insertHTML',false,esc(txt).replace(/\n/g,'<br>'));
+    }
+    saveRange();
+    D('вставка выполнена');
   });
-  D('редактор инициализирован');
+  D('редактор v3 инициализирован');
 }
 
 /* ---------- ПЕРВЫЙ ЗАПУСК ---------- */
@@ -222,7 +282,7 @@ function viewRecord(r){
   showTabRaw('view');
 }
 
-/* ---------- ОТКРЫТИЕ РЕДАКТОРА ---------- */
+/* ---------- РЕДАКТОР ЗАПИСИ ---------- */
 function fillCatSelect(){all('categories').then(cs=>{const s=document.getElementById('edCat');s.innerHTML='';cs.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;s.appendChild(o);});});}
 function fillClearSelect(){const s=document.getElementById('edClear');s.innerHTML='';for(let i=1;i<=ME.clearance;i++){const o=document.createElement('option');o.value=i;o.textContent='Допуск '+i;if(i===Math.min(3,ME.clearance))o.selected=true;s.appendChild(o);}}
 function openEditor(r){
