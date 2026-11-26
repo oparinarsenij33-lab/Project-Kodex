@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 11.2 · Akasha + Blockquote Fix ===
-const BUILD='build 11.2 (Akasha + Blockquote Fix)';
+// === КОДЕКС PWA · build 11.3 · Akasha + Blockquote Debug ===
+const BUILD='build 11.3 (Akasha + Blockquote Debug)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -27,9 +27,8 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
-/* ---------- САНИТАЙЗЕР (выравнивание + цитаты) ---------- */
+/* ---------- САНИТАЙЗЕР (универсальный) ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
-const PRESERVE_CLASSES=['ql-align-center','ql-align-right','ql-align-justify','ql-indent-1','ql-indent-2','ql-indent-3'];
 
 function cleanNode(node){
   if(node.nodeType===3) return document.createTextNode(node.nodeValue);
@@ -41,15 +40,21 @@ function cleanNode(node){
   if(!ALLOWED.includes(tag)) return kids;
   const el=document.createElement(tag.toLowerCase());
   
-  // Сохраняем полезные классы Quill (выравнивание, отступы цитат)
-  if(node.className && typeof node.className === 'string'){
-    const kept = node.className.split(' ').filter(c => PRESERVE_CLASSES.includes(c));
-    if(kept.length > 0) el.className = kept.join(' ');
+  // Сохраняем ВСЕ классы (выравнивание, отступы, цитаты)
+  if(node.className && typeof node.className === 'string' && node.className.trim()){
+    el.className = node.className.trim();
   }
   
-  // Также поддерживаем inline text-align
-  const al = node.style && node.style.textAlign;
-  if(al && ['left','center','right','justify'].includes(al)) el.style.textAlign = al;
+  // Сохраняем inline стили только для text-align и margin-left (цитаты)
+  if(node.style){
+    if(node.style.textAlign && ['left','center','right','justify'].includes(node.style.textAlign)){
+      el.style.textAlign = node.style.textAlign;
+    }
+    if(node.style.marginLeft || node.style.paddingLeft){
+      el.style.marginLeft = node.style.marginLeft || '20px';
+      el.style.fontStyle = 'italic';
+    }
+  }
   
   el.appendChild(kids);
   return el;
@@ -227,7 +232,17 @@ async function saveRecord(){
     const cat=document.getElementById('edCat').value;if(!cat)throw new Error('Выбери категорию.');
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
-    const body=quill?sanitize(quill.root.innerHTML):'';
+    
+    // Диагностика: показываем raw HTML цитат
+    const rawHtml = quill ? quill.root.innerHTML : '';
+    const hasBlockquote = rawHtml.includes('<blockquote');
+    D('DEBUG: есть blockquote='+hasBlockquote);
+    if(hasBlockquote){
+      const bqMatch = rawHtml.match(/<blockquote[^>]*>.*?<\/blockquote>/s);
+      if(bqMatch) D('DEBUG blockquote HTML: '+bqMatch[0].substring(0,200));
+    }
+    
+    const body=quill?sanitize(rawHtml):'';
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
     let code,id;
     if(editingId){code=editingId.code;id=editingId.id;}
