@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 10.1 · Quill Editor + Firebase Fix ===
-const BUILD='build 10.1 (Quill + Firebase Fix)';
+// === КОДЕКС PWA · build 10.3 · Quill + Align Fix ===
+const BUILD='build 10.3 (Quill + Align Fix)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -20,7 +20,7 @@ const db = firebase.firestore();
 
 let ME = null;
 let editingId = null;
-let quill = null; // Экземпляр Quill
+let quill = null;
 
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 function msg(id,t,ok){const el=document.getElementById(id);if(!el)return;el.textContent=t;el.className='msg '+(ok?'ok':'err');setTimeout(()=>el.className='msg',6000);}
@@ -28,26 +28,45 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
-/* ---------- САНИТАЙЗЕР ---------- */
+/* ---------- САНИТАЙЗЕР (с поддержкой text-align) ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
+
 function cleanNode(node){
-  if(node.nodeType===3)return document.createTextNode(node.nodeValue);
-  if(node.nodeType!==1)return document.createDocumentFragment();
+  if(node.nodeType===3) return document.createTextNode(node.nodeValue);
+  if(node.nodeType!==1) return document.createDocumentFragment();
+  
   const tag=node.tagName;
-  if(['SCRIPT','STYLE','IFRAME','OBJECT','LINK','META'].includes(tag))return document.createDocumentFragment();
+  if(['SCRIPT','STYLE','IFRAME','OBJECT','LINK','META'].includes(tag)) 
+    return document.createDocumentFragment();
+    
   const kids=document.createDocumentFragment();
-  node.childNodes.forEach(c=>kids.appendChild(cleanNode(c)));
-  if(!ALLOWED.includes(tag))return kids;
+  node.childNodes.forEach(c => kids.appendChild(cleanNode(c)));
+  
+  if(!ALLOWED.includes(tag)) return kids;
+  
   const el=document.createElement(tag.toLowerCase());
-  const al=node.style&&node.style.textAlign;
-  if(al&&['left','center','right','justify'].includes(al))el.style.textAlign=al;
-  el.appendChild(kids);return el;
+  
+  // Разрешаем ТОЛЬКО text-align из стилей
+  const al = node.style && node.style.textAlign;
+  if(al && ['left','center','right','justify'].includes(al)){
+    el.style.textAlign = al;
+  }
+  
+  el.appendChild(kids);
+  return el;
 }
-function sanitize(html){const t=document.createElement('div');t.innerHTML=html||'';const o=document.createElement('div');t.childNodes.forEach(c=>o.appendChild(cleanNode(c)));return o.innerHTML;}
+
+function sanitize(html){
+  const t=document.createElement('div');
+  t.innerHTML=html||'';
+  const o=document.createElement('div');
+  t.childNodes.forEach(c => o.appendChild(cleanNode(c)));
+  return o.innerHTML;
+}
 
 /* ---------- ИНИЦИАЛИЗАЦИЯ QUILL ---------- */
 function initEditor(){
-  if(quill) return; // Уже создан
+  if(quill) return;
   
   const toolbarOptions = [
     [{ 'header': [1, 2, 3, false] }],
@@ -75,7 +94,7 @@ function initEditor(){
 function selfTest(){
   if(!quill) {msg('edMsg','Редактор не загружен',false);return;}
   quill.setText('Проверка форматирования\n');
-  quill.setSelection(0, 8); // Выделяем "Проверка"
+  quill.setSelection(0, 8);
   quill.format('bold', true);
   const html = quill.root.innerHTML;
   const hasBold = html.includes('<strong>') || html.includes('<b>');
@@ -191,7 +210,6 @@ function openEditor(r){
   document.getElementById('edTags').value=r?(r.tags||''):'';
   document.getElementById('edSource').value=r?(r.source||''):'';
   
-  // Загружаем контент в Quill
   if(quill){
     const content = r ? sanitize(r.body||'') : '<p><br></p>';
     quill.clipboard.dangerouslyPasteHTML(content);
@@ -228,7 +246,6 @@ async function saveRecord(){
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
     
-    // Получаем HTML из Quill и санитайзим
     const body = quill ? sanitize(quill.root.innerHTML) : '';
     
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
@@ -323,7 +340,6 @@ async function forceUpdate(){
     await auth.signInAnonymously();D('авторизация выполнена');
     await ensureMaster();
     
-    // Инициализируем Quill ПОСЛЕ загрузки Firebase и DOM
     if(document.readyState==='loading'){
       document.addEventListener('DOMContentLoaded',initEditor);
     }else{
