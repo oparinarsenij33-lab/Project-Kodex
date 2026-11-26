@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 7 · Firebase Compat + fixes ===
-const BUILD='build 7 (Firebase Compat + fixes)';
+// === КОДЕКС PWA · build 9 · Standard execCommand Editor ===
+const BUILD='build 9 (Standard Editor)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -44,207 +44,82 @@ function cleanNode(node){
 }
 function sanitize(html){const t=document.createElement('div');t.innerHTML=html||'';const o=document.createElement('div');t.childNodes.forEach(c=>o.appendChild(cleanNode(c)));return o.innerHTML;}
 
-/* ---------- РЕДАКТОР НА DOM ---------- */
+/* ---------- РЕДАКТОР (СТАНДАРТНЫЙ) ---------- */
 function bodyEl(){return document.getElementById('edBody');}
-let savedRange=null;
 
-function captureRange(){
-  const sel=window.getSelection();
-  if(!sel||sel.rangeCount===0)return null;
-  const r=sel.getRangeAt(0);
-  const el=bodyEl();
-  if(!el.contains(r.commonAncestorContainer))return null;
-  return r.cloneRange();
-}
-function applyRange(r){
-  const el=bodyEl();el.focus();
-  const sel=window.getSelection();sel.removeAllRanges();sel.addRange(r);
-}
-function selectAllBody(){
-  const el=bodyEl();const r=document.createRange();r.selectNodeContents(el);applyRange(r);return r;
-}
-
-function wrapInline(tag){
-  let r=captureRange()||savedRange;
-  if(!r){D('нет выделения — применяю ко всему тексту');r=selectAllBody();}
-  applyRange(r);
-  if(r.collapsed){D('выделение пустое');msg('edMsg','Выдели фрагмент текста, потом нажимай стиль.',false);return false;}
-
-  let node=r.commonAncestorContainer;
-  if(node.nodeType===3)node=node.parentNode;
-  let existing=null,cur=node;
-  while(cur&&cur!==bodyEl()){if(cur.tagName&&cur.tagName.toLowerCase()===tag){existing=cur;break;}cur=cur.parentNode;}
-
-  if(existing){
-    const parent=existing.parentNode;
-    while(existing.firstChild)parent.insertBefore(existing.firstChild,existing);
-    parent.removeChild(existing);
-    bodyEl().normalize();
-    D('снят стиль '+tag);
-    return true;
-  }
-
-  const wrapper=document.createElement(tag);
-  try{
-    const frag=r.extractContents();
-    wrapper.appendChild(frag);
-    r.insertNode(wrapper);
-  }catch(e){
-    const txt=r.toString();
-    r.deleteContents();
-    wrapper.textContent=txt;
-    r.insertNode(wrapper);
-  }
-  bodyEl().normalize();
-  const nr=document.createRange();nr.selectNodeContents(wrapper);
-  applyRange(nr);savedRange=nr.cloneRange();
-  D('✓ применён стиль '+tag);
-  return true;
-}
-
-function setBlock(tag){
-  let r=captureRange()||savedRange;
-  if(!r)r=selectAllBody();
-  applyRange(r);
-  let node=r.commonAncestorContainer;
-  if(node.nodeType===3)node=node.parentNode;
-  let block=node;
-  while(block&&block.parentNode!==bodyEl())block=block.parentNode;
-  if(!block||block===bodyEl()){
-    const p=document.createElement(tag);
-    p.innerHTML=bodyEl().innerHTML||'<br>';
-    bodyEl().innerHTML='';bodyEl().appendChild(p);
-    D('✓ блок '+tag+' (весь текст)');return true;
-  }
-  const fresh=document.createElement(tag);
-  fresh.innerHTML=block.innerHTML||'<br>';
-  if(block.style&&block.style.textAlign)fresh.style.textAlign=block.style.textAlign;
-  block.parentNode.replaceChild(fresh,block);
-  const nr=document.createRange();nr.selectNodeContents(fresh);applyRange(nr);savedRange=nr.cloneRange();
-  D('✓ блок '+tag);return true;
-}
-
-function setAlign(dir){
-  let r=captureRange()||savedRange;
-  if(!r)r=selectAllBody();
-  applyRange(r);
-  let node=r.commonAncestorContainer;
-  if(node.nodeType===3)node=node.parentNode;
-  let block=node;
-  while(block&&block.parentNode!==bodyEl())block=block.parentNode;
-  if(!block||block===bodyEl()){bodyEl().style.textAlign=dir;D('✓ выравнивание всего: '+dir);return true;}
-  block.style.textAlign=dir;
-  D('✓ выравнивание '+dir);return true;
-}
-
-function makeList(type){
-  let r=captureRange()||savedRange;
-  if(!r)r=selectAllBody();
-  applyRange(r);
-  const text=r.toString()||bodyEl().innerText||'пункт';
-  const lines=text.split(/\n+/).filter(x=>x.trim());
-  if(lines.length===0)lines.push('пункт');
-  const list=document.createElement(type);
-  lines.forEach(l=>{const li=document.createElement('li');li.textContent=l.trim();list.appendChild(li);});
-  if(r.collapsed){bodyEl().appendChild(list);}
-  else{r.deleteContents();r.insertNode(list);}
-  D('✓ список '+type);return true;
-}
-
-function clearFormat(){
-  let r=captureRange()||savedRange;
-  if(!r||r.collapsed)r=selectAllBody();
-  applyRange(r);
-  const txt=r.toString();
-  r.deleteContents();
-  const tn=document.createTextNode(txt);
-  r.insertNode(tn);
-  bodyEl().normalize();
-  D('✓ форматирование снято');return true;
+function applyStyle(cmd,val=null){
+  bodyEl().focus();
+  try{document.execCommand('styleWithCSS',false,false);}catch(e){}
+  const ok=document.execCommand(cmd,false,val);
+  refreshToolbar();
+  return ok;
 }
 
 function refreshToolbar(){
   const tb=document.getElementById('edToolbar');if(!tb)return;
-  const sel=window.getSelection();
-  let node=sel&&sel.rangeCount?sel.getRangeAt(0).commonAncestorContainer:null;
-  if(node&&node.nodeType===3)node=node.parentNode;
-  const tags=[];let cur=node;
-  while(cur&&cur!==bodyEl()){if(cur.tagName)tags.push(cur.tagName.toLowerCase());cur=cur.parentNode;}
-  tb.querySelectorAll('button[data-inline]').forEach(b=>b.classList.toggle('active',tags.includes(b.dataset.inline)||(b.dataset.inline==='b'&&tags.includes('strong'))||(b.dataset.inline==='i'&&tags.includes('em'))));
-  tb.querySelectorAll('button[data-block]').forEach(b=>b.classList.toggle('active',tags.includes(b.dataset.block)));
+  // Проверяем состояние команд для подсветки кнопок
+  ['bold','italic','underline','strikeThrough','justifyLeft','justifyCenter','justifyRight'].forEach(cmd=>{
+    const btn=tb.querySelector(`[data-cmd="${cmd}"]`);
+    if(btn){try{btn.classList.toggle('active',document.queryCommandState(cmd));}catch(e){}}
+  });
 }
 
 function initEditor(){
   const tb=document.getElementById('edToolbar'),el=bodyEl();
-  if(!tb||!el){D('ОШИБКА: панель или поле редактора не найдены');return;}
+  if(!tb||!el){D('ОШИБКА редактора');return;}
+  
+  // Обработчики кнопок: просто вызываем execCommand
   tb.querySelectorAll('button').forEach(b=>{
-    const hold=e=>{e.preventDefault();e.stopPropagation();const r=captureRange();if(r)savedRange=r;};
-    b.addEventListener('pointerdown',hold);
-    b.addEventListener('mousedown',hold);
-    b.addEventListener('touchstart',hold,{passive:false});
     b.addEventListener('click',e=>{
-      e.preventDefault();e.stopPropagation();
-      if(b.dataset.inline)wrapInline(b.dataset.inline);
-      else if(b.dataset.block)setBlock(b.dataset.block);
-      else if(b.dataset.align)setAlign(b.dataset.align);
-      else if(b.dataset.list)makeList(b.dataset.list);
-      else if(b.dataset.clear)clearFormat();
-      refreshToolbar();
+      e.preventDefault(); // предотвращаем потерю фокуса
+      if(b.dataset.cmd){
+        applyStyle(b.dataset.cmd,b.dataset.val||null);
+      }else if(b.dataset.block){
+        applyStyle('formatBlock','<'+b.dataset.block+'>');
+      }else if(b.dataset.list){
+        applyStyle(b.dataset.list==='ul'?'insertUnorderedList':'insertOrderedList');
+      }else if(b.dataset.align){
+        applyStyle('justify'+b.dataset.align.charAt(0).toUpperCase()+b.dataset.align.slice(1));
+      }else if(b.dataset.clear){
+        applyStyle('removeFormat');
+      }
     });
   });
-  document.addEventListener('selectionchange',()=>{const r=captureRange();if(r){savedRange=r;refreshToolbar();}});
+
+  // Обновляем тулбар при изменении выделения или вводе
+  el.addEventListener('keyup',refreshToolbar);
+  el.addEventListener('mouseup',refreshToolbar);
+  el.addEventListener('input',refreshToolbar);
+  
+  // Вставка только чистого текста
   el.addEventListener('paste',e=>{
     e.preventDefault();
-    const cd=e.clipboardData||window.clipboardData;
-    const html=cd.getData('text/html'),txt=cd.getData('text/plain');
-    const r=captureRange()||selectAllBody();
-    applyRange(r);
-    if(!r.collapsed)r.deleteContents();
-    if(html){
-      const tmp=document.createElement('div');tmp.innerHTML=sanitize(html);
-      const frag=document.createDocumentFragment();
-      while(tmp.firstChild)frag.appendChild(tmp.firstChild);
-      r.insertNode(frag);
-    }else{
-      const parts=(txt||'').split(/\n/);
-      const frag=document.createDocumentFragment();
-      parts.forEach((p,i)=>{if(i)frag.appendChild(document.createElement('br'));frag.appendChild(document.createTextNode(p));});
-      r.insertNode(frag);
-    }
-    el.normalize();savedRange=null;
-    D('вставка выполнена');
+    const txt=(e.clipboardData||window.clipboardData).getData('text/plain');
+    document.execCommand('insertText',false,txt);
   });
-  D('редактор инициализирован, кнопок: '+tb.querySelectorAll('button').length);
+  
+  D('редактор инициализирован (стандартный режим)');
 }
 
 function selfTest(){
   const el=bodyEl();
-  el.innerHTML='<p>Проверка форматирования КОДЕКС</p>';
+  el.innerHTML='<p>Проверка форматирования</p>';
   const p=el.firstChild;
   const r=document.createRange();
-  r.setStart(p.firstChild,0);r.setEnd(p.firstChild,8);
-  applyRange(r);savedRange=r.cloneRange();
-  const ok=wrapInline('b');
-  const hasBold=/<b>/i.test(el.innerHTML);
-  D('ТЕСТ: wrapInline='+ok+', тег <b> в тексте='+hasBold);
-  msg('edMsg',hasBold?'✓ Тест пройден: слово «Проверка» стало жирным. Редактор работает.':'✗ Тест провален. Сообщи Магистру строку ТЕСТ из журнала.',hasBold);
+  r.selectNodeContents(p);
+  window.getSelection().removeAllRanges();
+  window.getSelection().addRange(r);
+  applyStyle('bold');
+  const hasBold=/<b>/i.test(el.innerHTML)||el.querySelector('strong');
+  D('ТЕСТ: жирный применён='+hasBold);
+  msg('edMsg',hasBold?'✓ Тест пройден':'✗ Тест провален',hasBold);
 }
 
 /* ---------- FIREBASE HELPERS ---------- */
-async function fbGet(path){
-  const snap=await db.doc(path).get();
-  return snap.exists?snap.data():null;
-}
-async function fbSet(path,data){
-  await db.doc(path).set(data,{merge:true});
-}
-async function fbDelete(path){
-  await db.doc(path).delete();
-}
-async function fbGetAll(colPath){
-  const snap=await db.collection(colPath).get();
-  return snap.docs.map(d=>({id:d.id,...d.data()}));
-}
+async function fbGet(path){const snap=await db.doc(path).get();return snap.exists?snap.data():null;}
+async function fbSet(path,data){await db.doc(path).set(data,{merge:true});}
+async function fbDelete(path){await db.doc(path).delete();}
+async function fbGetAll(colPath){const snap=await db.collection(colPath).get();return snap.docs.map(d=>({id:d.id,...d.data()}));}
 
 /* ---------- ПЕРВЫЙ ЗАПУСК ---------- */
 async function ensureMaster(){
@@ -252,14 +127,10 @@ async function ensureMaster(){
   if(users.length===0){
     const old='1234';const s=salt();
     await fbSet('users/Аранэль_Хальдарон',{name:'Аранэль Хальдарон',role:'МАГИСТР',clearance:5,salt:s,pinHash:await hashPin(old,s),created:now()});
-    D('Совет создан. PIN Магистра: '+old);
+    D('Совет создан. PIN: '+old);
   }
   const cats=await fbGetAll('categories');
-  if(cats.length===0){
-    for(const c of [{name:'ДОСЬЕ',prefix:'ДОС'},{name:'АНОМАЛИЯ',prefix:'АНО'},{name:'АРТЕФАКТ',prefix:'АРТ'},{name:'ПРОТОКОЛ',prefix:'ПРТ'},{name:'ЛОКАЦИЯ',prefix:'ЛОК'},{name:'ЗНАНИЕ',prefix:'ЗНН'}]){
-      await fbSet('categories/'+c.name,c);
-    }
-  }
+  if(cats.length===0)for(const c of [{name:'ДОСЬЕ',prefix:'ДОС'},{name:'АНОМАЛИЯ',prefix:'АНО'},{name:'АРТЕФАКТ',prefix:'АРТ'},{name:'ПРОТОКОЛ',prefix:'ПРТ'},{name:'ЛОКАЦИЯ',prefix:'ЛОК'},{name:'ЗНАНИЕ',prefix:'ЗНН'}])await fbSet('categories/'+c.name,c);
 }
 
 /* ---------- ВХОД ---------- */
@@ -267,12 +138,10 @@ async function login(){
   try{
     const nm=document.getElementById('loginName').value.trim(),p=document.getElementById('loginPass').value;
     if(!nm||!p)throw new Error('Введи имя и PIN.');
-    const users=await fbGetAll('users');
-    const u=users.find(x=>x.name.toLowerCase()===nm.toLowerCase());
-    if(!u)throw new Error('Оператор не найден в Совете.');
-    if(await hashPin(p,u.salt)!==u.pinHash)throw new Error('Неверный PIN-код.');
-    ME=u;
-    sessionStorage.setItem('kodex_me',JSON.stringify(ME));
+    const u=(await fbGetAll('users')).find(x=>x.name.toLowerCase()===nm.toLowerCase());
+    if(!u)throw new Error('Оператор не найден.');
+    if(await hashPin(p,u.salt)!==u.pinHash)throw new Error('Неверный PIN.');
+    ME=u;sessionStorage.setItem('kodex_me',JSON.stringify(ME));
     await enterMain();D('вход: '+u.name);
   }catch(e){msg('authMsg',e.message,false);D('вход: '+e.message);}
 }
@@ -317,10 +186,8 @@ async function renderList(){
 }
 async function deleteRecord(r){
   if(!confirm('Удалить '+r.code+' «'+r.title+'»?'))return;
-  try{
-    await fbDelete('records/'+r.id);
-    await addJournal('УДАЛЕНИЕ',r.code);D('удалено '+r.code);showTab('list');
-  }catch(e){alert('Не удалось удалить: '+e.message);}
+  try{await fbDelete('records/'+r.id);await addJournal('УДАЛЕНИЕ',r.code);D('удалено '+r.code);showTab('list');}
+  catch(e){alert('Ошибка удаления: '+e.message);}
 }
 
 /* ---------- ПРОСМОТР ---------- */
@@ -328,7 +195,7 @@ function viewRecord(r){
   if((r.clearance||1)>ME.clearance){alert('Недостаточный допуск.');return;}
   const vc=document.getElementById('viewContent');
   vc.innerHTML='<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
-    '<div class="meta">'+esc(r.category)+' · допуск '+(r.clearance||1)+' · автор: '+esc(r.author)+' · изменено: '+esc(r.updated||'')+'</div>'+
+    '<div class="meta">'+esc(r.category)+' · допуск '+(r.clearance||1)+' · автор: '+esc(r.author)+' · '+esc(r.updated||'')+'</div>'+
     '<div>'+(r.tags||'').split(',').filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join('')+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':'')+
     '<div class="body-text">'+sanitize(r.body||'')+'</div>'+
@@ -364,8 +231,8 @@ document.getElementById('edImageUrl').addEventListener('input',e=>{
   else{p.style.display='none';p.src='';}
 });
 function clearPhoto(){
-  const p=document.getElementById('imgPreview');
-  p.style.display='none';p.src='';
+  document.getElementById('imgPreview').style.display='none';
+  document.getElementById('imgPreview').src='';
   document.getElementById('edImageUrl').value='';
   if(editingId)editingId.imageUrl=null;
   D('фото удалено');
@@ -376,7 +243,7 @@ async function saveRecord(){
     if(!title)throw new Error('Пустое название.');
     const cat=document.getElementById('edCat').value;if(!cat)throw new Error('Выбери категорию.');
     const cl=parseInt(document.getElementById('edClear').value);
-    if(cl>ME.clearance)throw new Error('Нельзя задать допуск выше своего.');
+    if(cl>ME.clearance)throw new Error('Допуск выше своего.');
     const body=sanitize(bodyEl().innerHTML);
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
     let code,id;
@@ -385,8 +252,8 @@ async function saveRecord(){
     const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await fbSet('records/'+id,rec);
     await addJournal(editingId?'РЕДАКТИРОВАНИЕ':'СОЗДАНИЕ',code);
-    msg('edMsg','✓ Запись '+code+' сохранена.',true);setTimeout(()=>viewRecord(rec),300);
-  }catch(e){msg('edMsg',e.message,false);D('сохранение: '+e.message);}
+    msg('edMsg','✓ Сохранено.',true);setTimeout(()=>viewRecord(rec),300);
+  }catch(e){msg('edMsg',e.message,false);D('ошибка сохранения: '+e.message);}
 }
 
 /* ---------- КАТЕГОРИИ ---------- */
@@ -421,7 +288,7 @@ async function renderCouncil(){
       pin.value='';msg('councilMsg','✓ PIN обновлён: '+u.name,true);renderCouncil();};
     const rm=document.createElement('button');rm.type='button';rm.className='danger';rm.textContent='✖ УДАЛИТЬ';
     rm.onclick=async()=>{
-      if(u.name===ME.name){msg('councilMsg','Себя удалить нельзя.',false);return;}
+      if(u.name===ME.name){msg('councilMsg','Себя нельзя.',false);return;}
       if(u.clearance>=5&&users.filter(x=>x.clearance>=5).length<=1){msg('councilMsg','Последний Магистр.',false);return;}
       if(!confirm('Удалить '+u.name+'?'))return;
       await fbDelete('users/'+u.id);await addJournal('УДАЛЕНИЕ ОПЕРАТОРА',u.name);renderCouncil();};
@@ -445,45 +312,37 @@ async function addUser(){
 }
 
 /* ---------- ЖУРНАЛ ---------- */
-async function addJournal(action,detail){
-  try{
-    const id=Date.now().toString()+Math.random().toString(36).slice(2);
-    await fbSet('journal/'+id,{ts:now(),op:ME?ME.name:'система',action,detail:detail||''});
-  }catch(e){D('журнал: '+e.message);}
-}
+async function addJournal(action,detail){try{await fbSet('journal/'+Date.now()+Math.random().toString(36).slice(2),{ts:now(),op:ME?ME.name:'система',action,detail:detail||''});}catch(e){}}
 async function renderJournal(){
   const box=document.getElementById('journalList');
   if(ME.clearance<4){box.innerHTML='<p style="color:var(--err)">✖ Допуск 4+.</p>';return;}
-  const j=await fbGetAll('journal');
-  j.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
+  const j=await fbGetAll('journal');j.sort((a,b)=>(b.ts||'').localeCompare(a.ts||''));
   box.innerHTML=j.slice(0,150).map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join('')||'<p class="meta">Пусто.</p>';
 }
 
 /* ---------- ОБНОВЛЕНИЕ ---------- */
 async function forceUpdate(){
   try{
-    if('serviceWorker' in navigator){for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();}
-    if(window.caches){for(const k of await caches.keys())await caches.delete(k);}
+    if('serviceWorker' in navigator)for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();
+    if(window.caches)for(const k of await caches.keys())await caches.delete(k);
     location.reload();
   }catch(e){alert(e.message);}
 }
 
 /* ---------- СТАРТ ---------- */
 (async()=>{
-  D('инициализация КОДЕКСА Firebase Compat…');
+  D('инициализация КОДЕКСА Firebase...');
   try{
-    await auth.signInAnonymously();
-    D('анонимная авторизация выполнена');
+    await auth.signInAnonymously();D('авторизация выполнена');
     await ensureMaster();initEditor();
     const saved=sessionStorage.getItem('kodex_me');
     if(saved){
       ME=JSON.parse(saved);
-      const users=await fbGetAll('users');
-      const u=users.find(x=>x.name===ME.name);
+      const u=(await fbGetAll('users')).find(x=>x.name===ME.name);
       if(u&&u.pinHash===ME.pinHash){await enterMain();D('сессия восстановлена');return;}
       sessionStorage.removeItem('kodex_me');
     }
-  }catch(e){D('ОШИБКА СТАРТА: '+e.message);msg('authMsg','Ошибка подключения к базе: '+e.message,false);}
+  }catch(e){D('ОШИБКА: '+e.message);msg('authMsg','Ошибка базы: '+e.message,false);}
 })();
 
 if('serviceWorker' in navigator){
