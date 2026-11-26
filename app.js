@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 10.3 · Quill + Align Fix ===
-const BUILD='build 10.3 (Quill + Align Fix)';
+// === КОДЕКС PWA · build 10.4 · Quill + Align Classes Fix ===
+const BUILD='build 10.4 (Quill + Align Classes)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -28,8 +28,9 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
-/* ---------- САНИТАЙЗЕР (с поддержкой text-align) ---------- */
+/* ---------- САНИТАЙЗЕР (с поддержкой классов выравнивания Quill) ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
+const ALIGN_CLASSES=['ql-align-center','ql-align-right','ql-align-justify'];
 
 function cleanNode(node){
   if(node.nodeType===3) return document.createTextNode(node.nodeValue);
@@ -46,7 +47,13 @@ function cleanNode(node){
   
   const el=document.createElement(tag.toLowerCase());
   
-  // Разрешаем ТОЛЬКО text-align из стилей
+  // Сохраняем ТОЛЬКО классы выравнивания Quill
+  if(node.className && typeof node.className === 'string'){
+    const alignClass = node.className.split(' ').find(c => ALIGN_CLASSES.includes(c));
+    if(alignClass) el.className = alignClass;
+  }
+  
+  // Также поддерживаем inline text-align для совместимости
   const al = node.style && node.style.textAlign;
   if(al && ['left','center','right','justify'].includes(al)){
     el.style.textAlign = al;
