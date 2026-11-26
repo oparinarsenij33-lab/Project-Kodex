@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 10.4 · Quill + Align Classes Fix ===
-const BUILD='build 10.4 (Quill + Align Classes)';
+// === КОДЕКС PWA · build 10.5 · Quill + Debug Align ===
+const BUILD='build 10.5 (Quill + Debug Align)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -69,6 +69,26 @@ function sanitize(html){
   const o=document.createElement('div');
   t.childNodes.forEach(c => o.appendChild(cleanNode(c)));
   return o.innerHTML;
+}
+
+/* ---------- ДИАГНОСТИКА ВЫРАВНИВАНИЯ ---------- */
+function debugAlign() {
+  if (!quill) { D('DEBUG: Quill не загружен'); return; }
+  
+  const html = quill.root.innerHTML;
+  const sanitized = sanitize(html);
+  
+  D('DEBUG RAW: ' + html.substring(0, 200));
+  D('DEBUG SANITIZED: ' + sanitized.substring(0, 200));
+  D('DEBUG has ql-align: ' + html.includes('ql-align-'));
+  D('DEBUG has text-align: ' + html.includes('text-align'));
+  D('DEBUG sanitized has ql-align: ' + sanitized.includes('ql-align-'));
+  D('DEBUG sanitized has text-align: ' + sanitized.includes('text-align'));
+  
+  console.log('=== RAW HTML FROM QUILL ===');
+  console.log(html);
+  console.log('=== AFTER SANITIZE ===');
+  console.log(sanitized);
 }
 
 /* ---------- ИНИЦИАЛИЗАЦИЯ QUILL ---------- */
@@ -252,6 +272,9 @@ async function saveRecord(){
     const cat=document.getElementById('edCat').value;if(!cat)throw new Error('Выбери категорию.');
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
+    
+    // Запускаем диагностику перед сохранением
+    debugAlign();
     
     const body = quill ? sanitize(quill.root.innerHTML) : '';
     
