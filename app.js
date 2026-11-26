@@ -1,12 +1,10 @@
-// === КОДЕКС PWA · build 5 · Firebase Firestore ===
-const BUILD='build 5 (Firebase)';
+// === КОДЕКС PWA · build 7 · Firebase Compat + fixes ===
+const BUILD='build 7 (Firebase Compat + fixes)';
+
+function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
 
 /* ---------- FIREBASE CONFIG ---------- */
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-app.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-auth.js";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, deleteDoc, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore.js";
-
 const firebaseConfig = {
   apiKey: "AIzaSyBcC0AX5BTSvrZVMQwiLKfRqTDdY5nDbMI",
   authDomain: "kodex-archive.firebaseapp.com",
@@ -16,14 +14,13 @@ const firebaseConfig = {
   appId: "1:2107344225:web:c3eca829035757b968b120"
 };
 
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
 
 let ME = null;
 let editingId = null;
 
-function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 function msg(id,t,ok){const el=document.getElementById(id);if(!el)return;el.textContent=t;el.className='msg '+(ok?'ok':'err');setTimeout(()=>el.className='msg',6000);}
 function now(){return new Date().toLocaleString('ru-RU');}
@@ -235,17 +232,17 @@ function selfTest(){
 
 /* ---------- FIREBASE HELPERS ---------- */
 async function fbGet(path){
-  const snap=await getDoc(doc(db,path));
-  return snap.exists()?snap.data():null;
+  const snap=await db.doc(path).get();
+  return snap.exists?snap.data():null;
 }
 async function fbSet(path,data){
-  await setDoc(doc(db,path),data,{merge:true});
+  await db.doc(path).set(data,{merge:true});
 }
 async function fbDelete(path){
-  await deleteDoc(doc(db,path));
+  await db.doc(path).delete();
 }
 async function fbGetAll(colPath){
-  const snap=await getDocs(collection(db,colPath));
+  const snap=await db.collection(colPath).get();
   return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
@@ -366,6 +363,13 @@ document.getElementById('edImageUrl').addEventListener('input',e=>{
   if(url&&url.startsWith('http')){p.src=url;p.style.display='block';p.onerror=()=>{p.style.display='none';};}
   else{p.style.display='none';p.src='';}
 });
+function clearPhoto(){
+  const p=document.getElementById('imgPreview');
+  p.style.display='none';p.src='';
+  document.getElementById('edImageUrl').value='';
+  if(editingId)editingId.imageUrl=null;
+  D('фото удалено');
+}
 async function saveRecord(){
   try{
     const title=document.getElementById('edTitle').value.trim();
@@ -378,7 +382,7 @@ async function saveRecord(){
     let code,id;
     if(editingId){code=editingId.code;id=editingId.id;}
     else{const cs=await fbGetAll('categories');const c=cs.find(x=>x.name===cat);id=Date.now().toString();code=(c?c.prefix:'ЗАП')+'-'+id.slice(-4);}
-    const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:serverTimestamp()};
+    const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await fbSet('records/'+id,rec);
     await addJournal(editingId?'РЕДАКТИРОВАНИЕ':'СОЗДАНИЕ',code);
     msg('edMsg','✓ Запись '+code+' сохранена.',true);setTimeout(()=>viewRecord(rec),300);
@@ -466,9 +470,9 @@ async function forceUpdate(){
 
 /* ---------- СТАРТ ---------- */
 (async()=>{
-  D('инициализация КОДЕКСА Firebase…');
+  D('инициализация КОДЕКСА Firebase Compat…');
   try{
-    await signInAnonymously(auth);
+    await auth.signInAnonymously();
     D('анонимная авторизация выполнена');
     await ensureMaster();initEditor();
     const saved=sessionStorage.getItem('kodex_me');
