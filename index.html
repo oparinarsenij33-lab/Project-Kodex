@@ -40,7 +40,7 @@ label{font-size:12px;color:var(--dim)}
 #diag b{color:var(--holo2)}
 .img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
 .img-dossier{max-width:100%;border-radius:4px;border:1px solid var(--dim);margin-top:10px;display:block}
-.editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:6px;background:#03101f;border:1px solid var(--dim);border-radius:4px}
+.editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:6px;padding:6px;background:#03101f;border:1px solid var(--dim);border-radius:4px;position:sticky;top:0;z-index:10}
 .editor-toolbar button{padding:8px 12px;font-size:14px;margin:0;min-width:38px}
 .editor-toolbar button.active{background:rgba(79,195,247,.3);box-shadow:0 0 10px rgba(79,195,247,.7)}
 .editor-content{min-height:220px;background:#03101f;border:1px solid var(--dim);border-radius:4px;padding:10px;color:var(--holo2);font-family:inherit;font-size:15px;line-height:1.6;outline:none;overflow-y:auto}
@@ -118,6 +118,7 @@ label{font-size:12px;color:var(--dim)}
     <input id="edImageUrl" placeholder="https://sun9-xx.vkuserphoto.ru/...">
     <img id="imgPreview" class="img-preview">
     <div>
+      <button type="button" onclick="clearPhoto()">УБРАТЬ ФОТО</button>
       <button type="button" onclick="saveRecord()">💾 СОХРАНИТЬ</button>
       <button type="button" onclick="showTab('list')">ОТМЕНА</button>
     </div>
@@ -150,6 +151,11 @@ label{font-size:12px;color:var(--dim)}
 <div class="sub">Firebase Firestore · PWA · Offline-first</div>
 </div>
 <div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b></div>
-<script src="app.js?v=5"></script>
+
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
+
+<script src="app.js?v=7"></script>
 </body>
 </html>
