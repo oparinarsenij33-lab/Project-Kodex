@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 9.1 · Standard execCommand Editor (Mobile Fix) ===
-const BUILD='build 9.1 (Standard Editor + Mobile Fix)';
+// === КОДЕКС PWA · build 10.1 · Quill Editor + Firebase Fix ===
+const BUILD='build 10.1 (Quill + Firebase Fix)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -20,6 +20,7 @@ const db = firebase.firestore();
 
 let ME = null;
 let editingId = null;
+let quill = null; // Экземпляр Quill
 
 function esc(s){const d=document.createElement('div');d.textContent=s==null?'':String(s);return d.innerHTML;}
 function msg(id,t,ok){const el=document.getElementById(id);if(!el)return;el.textContent=t;el.className='msg '+(ok?'ok':'err');setTimeout(()=>el.className='msg',6000);}
@@ -44,78 +45,42 @@ function cleanNode(node){
 }
 function sanitize(html){const t=document.createElement('div');t.innerHTML=html||'';const o=document.createElement('div');t.childNodes.forEach(c=>o.appendChild(cleanNode(c)));return o.innerHTML;}
 
-/* ---------- РЕДАКТОР (СТАНДАРТНЫЙ + МОБИЛЬНЫЙ ФИКС) ---------- */
-function bodyEl(){return document.getElementById('edBody');}
-
-function applyStyle(cmd,val=null){
-  const el=bodyEl();
-  if(!el) return false;
-  el.focus();
-  try{document.execCommand('styleWithCSS',false,false);}catch(e){}
-  const ok=document.execCommand(cmd,false,val);
-  refreshToolbar();
-  return ok;
-}
-
-function refreshToolbar(){
-  const tb=document.getElementById('edToolbar');if(!tb)return;
-  ['bold','italic','underline','strikeThrough','justifyLeft','justifyCenter','justifyRight'].forEach(cmd=>{
-    const btn=tb.querySelector(`[data-cmd="${cmd}"]`);
-    if(btn){try{btn.classList.toggle('active',document.queryCommandState(cmd));}catch(e){}}
-  });
-}
-
+/* ---------- ИНИЦИАЛИЗАЦИЯ QUILL ---------- */
 function initEditor(){
-  const tb=document.getElementById('edToolbar'),el=bodyEl();
-  if(!tb||!el){D('ОШИБКА редактора');return;}
+  if(quill) return; // Уже создан
   
-  // Обработчики кнопок с защитой для мобильных устройств
-  tb.querySelectorAll('button').forEach(b=>{
-    // На мобильных preventDefault на mousedown/touchstart блокирует потерю выделения
-    b.addEventListener('mousedown',e=>e.preventDefault());
-    b.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
-    
-    b.addEventListener('click',e=>{
-      e.preventDefault();
-      if(b.dataset.cmd){
-        applyStyle(b.dataset.cmd,b.dataset.val||null);
-      }else if(b.dataset.block){
-        applyStyle('formatBlock','<'+b.dataset.block+'>');
-      }else if(b.dataset.list){
-        applyStyle(b.dataset.list==='ul'?'insertUnorderedList':'insertOrderedList');
-      }else if(b.dataset.align){
-        applyStyle('justify'+b.dataset.align.charAt(0).toUpperCase()+b.dataset.align.slice(1));
-      }else if(b.dataset.clear){
-        applyStyle('removeFormat');
-      }
-    });
-  });
+  const toolbarOptions = [
+    [{ 'header': [1, 2, 3, false] }],
+    ['bold', 'italic', 'underline', 'strike'],
+    [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+    [{ 'align': [] }],
+    ['blockquote'],
+    ['clean']
+  ];
 
-  el.addEventListener('keyup',refreshToolbar);
-  el.addEventListener('mouseup',refreshToolbar);
-  el.addEventListener('input',refreshToolbar);
-  
-  el.addEventListener('paste',e=>{
-    e.preventDefault();
-    const txt=(e.clipboardData||window.clipboardData).getData('text/plain');
-    document.execCommand('insertText',false,txt);
-  });
-  
-  D('редактор инициализирован (стандартный режим + мобильный фикс)');
+  try {
+    quill = new Quill('#editor', {
+      theme: 'snow',
+      modules: {
+        toolbar: toolbarOptions
+      },
+      placeholder: 'Введите текст досье...'
+    });
+    D('Quill инициализирован успешно');
+  } catch(e) {
+    D('ОШИБКА инициализации Quill: '+e.message);
+  }
 }
 
 function selfTest(){
-  const el=bodyEl();
-  el.innerHTML='<p>Проверка форматирования</p>';
-  const p=el.firstChild;
-  const r=document.createRange();
-  r.selectNodeContents(p);
-  window.getSelection().removeAllRanges();
-  window.getSelection().addRange(r);
-  applyStyle('bold');
-  const hasBold=/<b>/i.test(el.innerHTML)||el.querySelector('strong');
+  if(!quill) {msg('edMsg','Редактор не загружен',false);return;}
+  quill.setText('Проверка форматирования\n');
+  quill.setSelection(0, 8); // Выделяем "Проверка"
+  quill.format('bold', true);
+  const html = quill.root.innerHTML;
+  const hasBold = html.includes('<strong>') || html.includes('<b>');
   D('ТЕСТ: жирный применён='+hasBold);
-  msg('edMsg',hasBold?'✓ Тест пройден':'✗ Тест провален',hasBold);
+  msg('edMsg',hasBold?'✓ Тест пройден. Редактор работает.':'✗ Тест провален.',hasBold);
 }
 
 /* ---------- FIREBASE HELPERS ---------- */
@@ -213,26 +178,40 @@ function viewRecord(r){
 /* ---------- РЕДАКТОР ЗАПИСИ ---------- */
 function fillCatSelect(){fbGetAll('categories').then(cs=>{const s=document.getElementById('edCat');s.innerHTML='';cs.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;s.appendChild(o);});});}
 function fillClearSelect(){const s=document.getElementById('edClear');s.innerHTML='';for(let i=1;i<=ME.clearance;i++){const o=document.createElement('option');o.value=i;o.textContent='Допуск '+i;if(i===Math.min(3,ME.clearance))o.selected=true;s.appendChild(o);}}
+
 function openEditor(r){
   editingId=r||null;
   document.getElementById('editorTitle').textContent=r?'─── РЕДАКТИРОВАНИЕ '+r.code+' ───':'─── НОВАЯ ЗАПИСЬ ───';
   document.getElementById('edTitle').value=r?r.title:'';
   fillCatSelect();fillClearSelect();
-  setTimeout(()=>{document.getElementById('edCat').value=r?r.category:'ДОСЬЕ';document.getElementById('edClear').value=r?(r.clearance||1):Math.min(3,ME.clearance);},0);
+  setTimeout(()=>{
+    document.getElementById('edCat').value=r?r.category:'ДОСЬЕ';
+    document.getElementById('edClear').value=r?(r.clearance||1):Math.min(3,ME.clearance);
+  },0);
   document.getElementById('edTags').value=r?(r.tags||''):'';
   document.getElementById('edSource').value=r?(r.source||''):'';
-  bodyEl().innerHTML=r?sanitize(r.body||''):'<p><br></p>';
+  
+  // Загружаем контент в Quill
+  if(quill){
+    const content = r ? sanitize(r.body||'') : '<p><br></p>';
+    quill.clipboard.dangerouslyPasteHTML(content);
+  } else {
+    D('ОШИБКА: Quill не инициализирован');
+  }
+  
   document.getElementById('edImageUrl').value=r?(r.imageUrl||''):'';
   const p=document.getElementById('imgPreview');
   if(r&&r.imageUrl){p.src=r.imageUrl;p.style.display='block';}else{p.style.display='none';p.src='';}
   document.getElementById('edMsg').className='msg';
-  showTabRaw('editor');bodyEl().focus();
+  showTabRaw('editor');
 }
+
 document.getElementById('edImageUrl').addEventListener('input',e=>{
   const url=e.target.value.trim();const p=document.getElementById('imgPreview');
   if(url&&url.startsWith('http')){p.src=url;p.style.display='block';p.onerror=()=>{p.style.display='none';};}
   else{p.style.display='none';p.src='';}
 });
+
 function clearPhoto(){
   document.getElementById('imgPreview').style.display='none';
   document.getElementById('imgPreview').src='';
@@ -240,6 +219,7 @@ function clearPhoto(){
   if(editingId)editingId.imageUrl=null;
   D('фото удалено');
 }
+
 async function saveRecord(){
   try{
     const title=document.getElementById('edTitle').value.trim();
@@ -247,11 +227,15 @@ async function saveRecord(){
     const cat=document.getElementById('edCat').value;if(!cat)throw new Error('Выбери категорию.');
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
-    const body=sanitize(bodyEl().innerHTML);
+    
+    // Получаем HTML из Quill и санитайзим
+    const body = quill ? sanitize(quill.root.innerHTML) : '';
+    
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
     let code,id;
     if(editingId){code=editingId.code;id=editingId.id;}
     else{const cs=await fbGetAll('categories');const c=cs.find(x=>x.name===cat);id=Date.now().toString();code=(c?c.prefix:'ЗАП')+'-'+id.slice(-4);}
+    
     const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await fbSet('records/'+id,rec);
     await addJournal(editingId?'РЕДАКТИРОВАНИЕ':'СОЗДАНИЕ',code);
@@ -337,7 +321,15 @@ async function forceUpdate(){
   D('инициализация КОДЕКСА Firebase...');
   try{
     await auth.signInAnonymously();D('авторизация выполнена');
-    await ensureMaster();initEditor();
+    await ensureMaster();
+    
+    // Инициализируем Quill ПОСЛЕ загрузки Firebase и DOM
+    if(document.readyState==='loading'){
+      document.addEventListener('DOMContentLoaded',initEditor);
+    }else{
+      initEditor();
+    }
+    
     const saved=sessionStorage.getItem('kodex_me');
     if(saved){
       ME=JSON.parse(saved);
