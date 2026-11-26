@@ -6,34 +6,23 @@
 <title>КОДЕКС — Архив Ордена Вольных Джедаев</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#f5f0e6">
-<!-- Quill CSS -->
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
-<!-- Google Fonts для стиля Акаши -->
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=EB+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#f5f0e6;
-  --panel:#faf7f0;
-  --text:#3d3425;
-  --text-secondary:#6b5e4b;
-  --accent:#8b7355;
-  --accent-light:#a89070;
-  --border:#d4c9b8;
-  --gold:#b8976a;
-  --gold-dark:#8b6f47;
-  --err:#c0392b;
-  --ok:#27ae60;
-  --shadow:rgba(139,115,85,.12);
+  --bg:#f5f0e6;--panel:#faf7f0;--text:#3d3425;--text-secondary:#6b5e4b;
+  --accent:#8b7355;--border:#d4c9b8;--gold:#b8976a;--gold-dark:#8b6f47;
+  --err:#c0392b;--ok:#27ae60;--shadow:rgba(139,115,85,.12);
 }
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--text);font-family:"EB Garamond","Cormorant Garamond",Georgia,"Times New Roman",serif;font-size:17px;line-height:1.7;min-height:100vh;padding-bottom:150px}
+body{background:var(--bg);color:var(--text);font-family:"EB Garamond","Cormorant Garamond",Georgia,serif;font-size:17px;line-height:1.7;min-height:100vh;padding-bottom:150px}
 .wrap{max-width:860px;margin:0 auto;padding:24px 20px}
 h1{text-align:center;font-family:"Cormorant Garamond",serif;font-size:clamp(22px,5vw,34px);letter-spacing:6px;color:var(--gold-dark);padding:24px 0 6px;font-weight:700}
-.sub{text-align:center;color:var(--text-secondary);font-size:14px;margin-bottom:24px;font-style:italic;letter-spacing:1px}
+.sub{text-align:center;color:var(--text-secondary);font-size:14px;margin-bottom:24px;font-style:italic}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 2px 12px var(--shadow)}
-input,select{width:100%;background:#fff;border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:16px;padding:10px 12px;border-radius:6px;margin:6px 0;transition:border-color .2s}
+input,select{width:100%;background:#fff;border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:16px;padding:10px 12px;border-radius:6px;margin:6px 0}
 input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,151,106,.2)}
-button{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:inherit;font-size:14px;padding:10px 16px;border-radius:6px;cursor:pointer;margin:4px 4px 4px 0;letter-spacing:.5px;transition:all .2s;font-weight:600}
+button{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:inherit;font-size:14px;padding:10px 16px;border-radius:6px;cursor:pointer;margin:4px 4px 4px 0;font-weight:600}
 button:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
 button.danger{border-color:var(--err);color:var(--err)}
 button.danger:hover{background:var(--err);color:#fff}
@@ -41,8 +30,8 @@ button.danger:hover{background:var(--err);color:#fff}
 .msg{padding:10px;border-radius:6px;margin:8px 0;font-size:14px;display:none}
 .msg.ok{display:block;color:var(--ok);border:1px solid var(--ok);background:rgba(39,174,96,.08)}
 .msg.err{display:block;color:var(--err);border:1px solid var(--err);background:rgba(192,57,43,.08)}
-.rec{border:1px solid var(--border);border-left:3px solid var(--gold);padding:12px 14px;margin:8px 0;border-radius:6px;cursor:pointer;background:var(--panel);transition:all .2s}
-.rec:hover{background:#fff;box-shadow:0 2px 8px var(--shadow);border-left-color:var(--gold-dark)}
+.rec{border:1px solid var(--border);border-left:3px solid var(--gold);padding:12px 14px;margin:8px 0;border-radius:6px;cursor:pointer;background:var(--panel)}
+.rec:hover{background:#fff;box-shadow:0 2px 8px var(--shadow)}
 .code{color:var(--gold-dark);font-weight:700;font-family:"Cormorant Garamond",serif;font-size:18px}
 .locked{color:var(--text-secondary);font-style:italic}
 .meta{color:var(--text-secondary);font-size:13px;margin:4px 0}
@@ -51,7 +40,7 @@ button.danger:hover{background:var(--err);color:#fff}
 .body-text li{margin:6px 0;padding-left:4px}
 .tag{display:inline-block;border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:12px;margin:2px;color:var(--text-secondary);background:var(--panel)}
 .hidden{display:none!important}
-.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--text-secondary);margin-bottom:12px;font-family:"Cormorant Garamond",serif;font-weight:600;letter-spacing:.5px}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--text-secondary);margin-bottom:12px;font-family:"Cormorant Garamond",serif;font-weight:600}
 .journal-line{font-size:13px;color:var(--text-secondary);padding:3px 0;border-bottom:1px solid var(--border)}
 label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
 #diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:140px;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text-secondary);z-index:100;font-family:"Consolas",monospace}
@@ -59,24 +48,38 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
 .img-preview{max-width:100%;max-height:300px;border:1px solid var(--border);border-radius:6px;margin-top:8px;display:none}
 .img-dossier{max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:12px;display:block}
 
-/* Quill в стиле Акаши — ПАНЕЛЬ ЗАКРЕПЛЕНА */
+/* Quill */
 .ql-toolbar{background:var(--panel)!important;border:1px solid var(--border)!important;border-radius:6px 6px 0 0;position:sticky;top:0;z-index:50}
 .ql-container{background:#fff!important;border:1px solid var(--border)!important;border-radius:0 0 6px 6px;color:var(--text);font-family:inherit;font-size:17px;min-height:240px}
 .ql-editor{color:var(--text);min-height:240px;font-size:17px;line-height:1.7}
 .ql-editor h1,.ql-editor h2,.ql-editor h3{color:var(--gold-dark);margin:12px 0 6px;font-family:"Cormorant Garamond",serif}
 .ql-editor blockquote{border-left:3px solid var(--gold);padding-left:12px;color:var(--text-secondary);font-style:italic}
-.ql-stroke{stroke:var(--accent)!important}
-.ql-fill{fill:var(--accent)!important}
-.ql-picker-label,.ql-picker-item{color:var(--text)!important;font-family:inherit}
-.ql-active .ql-stroke{stroke:var(--gold-dark)!important}
-.ql-active .ql-fill{fill:var(--gold-dark)!important}
-.ql-toolbar button:hover .ql-stroke{stroke:var(--gold-dark)!important}
-.ql-toolbar button:hover .ql-fill{fill:var(--gold-dark)!important}
+.ql-stroke{stroke:var(--accent)!important}.ql-fill{fill:var(--accent)!important}
+.ql-picker-label,.ql-picker-item{color:var(--text)!important}
+.ql-active .ql-stroke{stroke:var(--gold-dark)!important}.ql-active .ql-fill{fill:var(--gold-dark)!important}
 
-/* Выравнивание вне редактора */
+/* Выравнивание и отступы вне редактора */
 .ql-align-center{text-align:center!important}
 .ql-align-right{text-align:right!important}
 .ql-align-justify{text-align:justify!important}
+
+/* Универсальная поддержка цитат и отступов */
+.body-text blockquote,
+.body-text [style*="margin-left"],
+.body-text [style*="padding-left"]{
+  border-left:3px solid var(--gold)!important;
+  padding-left:16px!important;
+  margin-left:8px!important;
+  font-style:italic!important;
+  color:var(--text-secondary)!important;
+}
+.body-text .ql-indent-1,
+.body-text .ql-indent-2,
+.body-text .ql-indent-3{
+  margin-left:24px!important;
+  font-style:italic!important;
+  color:var(--text-secondary)!important;
+}
 </style>
 </head>
 <body>
@@ -105,14 +108,11 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
       <button type="button" onclick="forceUpdate()">⟳ Обновить</button>
     </div>
   </div>
-
   <div id="tab-list" class="panel"><div id="recList"></div></div>
-
   <div id="tab-view" class="panel hidden">
     <button type="button" onclick="showTab('list')" style="margin-bottom:12px">← Назад</button>
     <div id="viewContent"></div>
   </div>
-
   <div id="tab-editor" class="panel hidden">
     <p id="editorTitle" style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Новая запись ───</p>
     <input id="edTitle" placeholder="Название записи">
@@ -132,7 +132,6 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
     </div>
     <div id="edMsg" class="msg"></div>
   </div>
-
   <div id="tab-cats" class="panel hidden">
     <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Категории ───</p>
     <div id="catList"></div>
@@ -140,12 +139,10 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
     <button type="button" onclick="addCategory()" style="margin-top:8px">Добавить категорию</button>
     <div id="catMsg" class="msg"></div>
   </div>
-
   <div id="tab-journal" class="panel hidden">
     <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Журнал доступа ───</p>
     <div id="journalList"></div>
   </div>
-
   <div id="tab-council" class="panel hidden">
     <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Совет: операторы и доступ ───</p>
     <div id="userList"></div>
@@ -168,6 +165,6 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-<script src="app.js?v=11.1"></script>
+<script src="app.js?v=11.4"></script>
 </body>
 </html>
