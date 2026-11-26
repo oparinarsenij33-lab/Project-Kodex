@@ -1,10 +1,9 @@
-// === КОДЕКС PWA · build 10.5 · Quill + Debug Align ===
-const BUILD='build 10.5 (Quill + Debug Align)';
+// === КОДЕКС PWA · build 11.0 · Akasha Theme ===
+const BUILD='build 11.0 (Akasha Theme)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
 
-/* ---------- FIREBASE CONFIG ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyBcC0AX5BTSvrZVMQwiLKfRqTDdY5nDbMI",
   authDomain: "kodex-archive.firebaseapp.com",
@@ -28,73 +27,37 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
-/* ---------- САНИТАЙЗЕР (с поддержкой классов выравнивания Quill) ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
 const ALIGN_CLASSES=['ql-align-center','ql-align-right','ql-align-justify'];
 
 function cleanNode(node){
   if(node.nodeType===3) return document.createTextNode(node.nodeValue);
   if(node.nodeType!==1) return document.createDocumentFragment();
-  
   const tag=node.tagName;
-  if(['SCRIPT','STYLE','IFRAME','OBJECT','LINK','META'].includes(tag)) 
-    return document.createDocumentFragment();
-    
+  if(['SCRIPT','STYLE','IFRAME','OBJECT','LINK','META'].includes(tag)) return document.createDocumentFragment();
   const kids=document.createDocumentFragment();
   node.childNodes.forEach(c => kids.appendChild(cleanNode(c)));
-  
   if(!ALLOWED.includes(tag)) return kids;
-  
   const el=document.createElement(tag.toLowerCase());
-  
-  // Сохраняем ТОЛЬКО классы выравнивания Quill
   if(node.className && typeof node.className === 'string'){
     const alignClass = node.className.split(' ').find(c => ALIGN_CLASSES.includes(c));
     if(alignClass) el.className = alignClass;
   }
-  
-  // Также поддерживаем inline text-align для совместимости
   const al = node.style && node.style.textAlign;
-  if(al && ['left','center','right','justify'].includes(al)){
-    el.style.textAlign = al;
-  }
-  
+  if(al && ['left','center','right','justify'].includes(al)) el.style.textAlign = al;
   el.appendChild(kids);
   return el;
 }
 
 function sanitize(html){
-  const t=document.createElement('div');
-  t.innerHTML=html||'';
+  const t=document.createElement('div');t.innerHTML=html||'';
   const o=document.createElement('div');
   t.childNodes.forEach(c => o.appendChild(cleanNode(c)));
   return o.innerHTML;
 }
 
-/* ---------- ДИАГНОСТИКА ВЫРАВНИВАНИЯ ---------- */
-function debugAlign() {
-  if (!quill) { D('DEBUG: Quill не загружен'); return; }
-  
-  const html = quill.root.innerHTML;
-  const sanitized = sanitize(html);
-  
-  D('DEBUG RAW: ' + html.substring(0, 200));
-  D('DEBUG SANITIZED: ' + sanitized.substring(0, 200));
-  D('DEBUG has ql-align: ' + html.includes('ql-align-'));
-  D('DEBUG has text-align: ' + html.includes('text-align'));
-  D('DEBUG sanitized has ql-align: ' + sanitized.includes('ql-align-'));
-  D('DEBUG sanitized has text-align: ' + sanitized.includes('text-align'));
-  
-  console.log('=== RAW HTML FROM QUILL ===');
-  console.log(html);
-  console.log('=== AFTER SANITIZE ===');
-  console.log(sanitized);
-}
-
-/* ---------- ИНИЦИАЛИЗАЦИЯ QUILL ---------- */
 function initEditor(){
   if(quill) return;
-  
   const toolbarOptions = [
     [{ 'header': [1, 2, 3, false] }],
     ['bold', 'italic', 'underline', 'strike'],
@@ -103,39 +66,31 @@ function initEditor(){
     ['blockquote'],
     ['clean']
   ];
-
   try {
     quill = new Quill('#editor', {
       theme: 'snow',
-      modules: {
-        toolbar: toolbarOptions
-      },
+      modules: { toolbar: toolbarOptions },
       placeholder: 'Введите текст досье...'
     });
-    D('Quill инициализирован успешно');
-  } catch(e) {
-    D('ОШИБКА инициализации Quill: '+e.message);
-  }
+    D('Quill инициализирован');
+  } catch(e) { D('ОШИБКА Quill: '+e.message); }
 }
 
 function selfTest(){
-  if(!quill) {msg('edMsg','Редактор не загружен',false);return;}
+  if(!quill){msg('edMsg','Редактор не загружен',false);return;}
   quill.setText('Проверка форматирования\n');
   quill.setSelection(0, 8);
   quill.format('bold', true);
-  const html = quill.root.innerHTML;
-  const hasBold = html.includes('<strong>') || html.includes('<b>');
-  D('ТЕСТ: жирный применён='+hasBold);
-  msg('edMsg',hasBold?'✓ Тест пройден. Редактор работает.':'✗ Тест провален.',hasBold);
+  const hasBold = quill.root.innerHTML.includes('<strong>') || quill.root.innerHTML.includes('<b>');
+  D('ТЕСТ: жирный='+hasBold);
+  msg('edMsg',hasBold?'✓ Тест пройден':'✗ Тест провален',hasBold);
 }
 
-/* ---------- FIREBASE HELPERS ---------- */
 async function fbGet(path){const snap=await db.doc(path).get();return snap.exists?snap.data():null;}
 async function fbSet(path,data){await db.doc(path).set(data,{merge:true});}
 async function fbDelete(path){await db.doc(path).delete();}
 async function fbGetAll(colPath){const snap=await db.collection(colPath).get();return snap.docs.map(d=>({id:d.id,...d.data()}));}
 
-/* ---------- ПЕРВЫЙ ЗАПУСК ---------- */
 async function ensureMaster(){
   const users=await fbGetAll('users');
   if(users.length===0){
@@ -147,7 +102,6 @@ async function ensureMaster(){
   if(cats.length===0)for(const c of [{name:'ДОСЬЕ',prefix:'ДОС'},{name:'АНОМАЛИЯ',prefix:'АНО'},{name:'АРТЕФАКТ',prefix:'АРТ'},{name:'ПРОТОКОЛ',prefix:'ПРТ'},{name:'ЛОКАЦИЯ',prefix:'ЛОК'},{name:'ЗНАНИЕ',prefix:'ЗНН'}])await fbSet('categories/'+c.name,c);
 }
 
-/* ---------- ВХОД ---------- */
 async function login(){
   try{
     const nm=document.getElementById('loginName').value.trim(),p=document.getElementById('loginPass').value;
@@ -169,12 +123,10 @@ async function enterMain(){
   fillCatSelect();fillClearSelect();showTab('list');
 }
 
-/* ---------- ТАБЫ ---------- */
 const TABS=['list','view','editor','cats','council','journal'];
 function showTabRaw(t){TABS.forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));}
 function showTab(t){showTabRaw(t);if(t==='list')renderList();if(t==='cats')renderCats();if(t==='council')renderCouncil();if(t==='journal')renderJournal();}
 
-/* ---------- СПИСОК ---------- */
 async function renderList(){
   const q=(document.getElementById('searchBox').value||'').toLowerCase();
   const box=document.getElementById('recList');box.innerHTML='';
@@ -185,7 +137,7 @@ async function renderList(){
     if((r.clearance||1)>ME.clearance){
       if(q)continue;
       const d=document.createElement('div');d.className='rec';d.style.cursor='default';
-      d.innerHTML='<span class="locked">▓▓▓▓ │ [ЗАСЕКРЕЧЕНО — допуск '+r.clearance+']</span>';
+      d.innerHTML='<span class="locked">▓▓▓▓ │ Засекречено — требуется допуск '+r.clearance+'</span>';
       box.appendChild(d);shown++;continue;
     }
     if(q&&!((r.title||'')+(r.tags||'')+r.code+(r.category||'')+(r.source||'')).toLowerCase().includes(q))continue;
@@ -193,7 +145,7 @@ async function renderList(){
     const info=document.createElement('div');
     info.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+(r.clearance||1)+' · '+esc(r.updated||'')+'</div>';
     info.onclick=()=>viewRecord(r);d.appendChild(info);
-    if(ME.clearance>=4){const b=document.createElement('button');b.type='button';b.className='danger';b.textContent='✖ УДАЛИТЬ';b.onclick=ev=>{ev.stopPropagation();deleteRecord(r);};d.appendChild(b);}
+    if(ME.clearance>=4){const b=document.createElement('button');b.type='button';b.className='danger';b.textContent='✖ Удалить';b.onclick=ev=>{ev.stopPropagation();deleteRecord(r);};d.appendChild(b);}
     box.appendChild(d);shown++;
   }
   if(!shown)box.innerHTML='<p class="meta">Архив молчит…</p>';
@@ -201,49 +153,38 @@ async function renderList(){
 async function deleteRecord(r){
   if(!confirm('Удалить '+r.code+' «'+r.title+'»?'))return;
   try{await fbDelete('records/'+r.id);await addJournal('УДАЛЕНИЕ',r.code);D('удалено '+r.code);showTab('list');}
-  catch(e){alert('Ошибка удаления: '+e.message);}
+  catch(e){alert('Ошибка: '+e.message);}
 }
 
-/* ---------- ПРОСМОТР ---------- */
 function viewRecord(r){
   if((r.clearance||1)>ME.clearance){alert('Недостаточный допуск.');return;}
   const vc=document.getElementById('viewContent');
-  vc.innerHTML='<h2 style="color:var(--holo2)">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
+  vc.innerHTML='<h2 style="color:var(--gold-dark);font-family:Cormorant Garamond,serif;font-size:26px;margin-bottom:8px">'+esc(r.code)+' ══ '+esc(r.title)+'</h2>'+
     '<div class="meta">'+esc(r.category)+' · допуск '+(r.clearance||1)+' · автор: '+esc(r.author)+' · '+esc(r.updated||'')+'</div>'+
     '<div>'+(r.tags||'').split(',').filter(t=>t.trim()).map(t=>'<span class="tag">'+esc(t.trim())+'</span>').join('')+'</div>'+
     (r.source?'<div class="meta">Источник: '+esc(r.source)+'</div>':'')+
     '<div class="body-text">'+sanitize(r.body||'')+'</div>'+
     (r.imageUrl?'<img src="'+esc(r.imageUrl)+'" class="img-dossier">':'')+
-    '<div style="margin-top:10px"><button type="button" id="btnEdit">✎ РЕДАКТИРОВАТЬ</button>'+
-    (ME.clearance>=4?' <button type="button" class="danger" id="btnDel">✖ УДАЛИТЬ</button>':'')+'</div>';
+    '<div style="margin-top:14px"><button type="button" id="btnEdit">✎ Редактировать</button>'+
+    (ME.clearance>=4?' <button type="button" class="danger" id="btnDel">✖ Удалить</button>':'')+'</div>';
   document.getElementById('btnEdit').onclick=()=>openEditor(r);
   const bd=document.getElementById('btnDel');if(bd)bd.onclick=()=>deleteRecord(r);
   showTabRaw('view');
 }
 
-/* ---------- РЕДАКТОР ЗАПИСИ ---------- */
 function fillCatSelect(){fbGetAll('categories').then(cs=>{const s=document.getElementById('edCat');s.innerHTML='';cs.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;s.appendChild(o);});});}
 function fillClearSelect(){const s=document.getElementById('edClear');s.innerHTML='';for(let i=1;i<=ME.clearance;i++){const o=document.createElement('option');o.value=i;o.textContent='Допуск '+i;if(i===Math.min(3,ME.clearance))o.selected=true;s.appendChild(o);}}
 
 function openEditor(r){
   editingId=r||null;
-  document.getElementById('editorTitle').textContent=r?'─── РЕДАКТИРОВАНИЕ '+r.code+' ───':'─── НОВАЯ ЗАПИСЬ ───';
+  document.getElementById('editorTitle').textContent=r?'─── Редактирование '+r.code+' ───':'─── Новая запись ───';
   document.getElementById('edTitle').value=r?r.title:'';
   fillCatSelect();fillClearSelect();
-  setTimeout(()=>{
-    document.getElementById('edCat').value=r?r.category:'ДОСЬЕ';
-    document.getElementById('edClear').value=r?(r.clearance||1):Math.min(3,ME.clearance);
-  },0);
+  setTimeout(()=>{document.getElementById('edCat').value=r?r.category:'ДОСЬЕ';document.getElementById('edClear').value=r?(r.clearance||1):Math.min(3,ME.clearance);},0);
   document.getElementById('edTags').value=r?(r.tags||''):'';
   document.getElementById('edSource').value=r?(r.source||''):'';
-  
-  if(quill){
-    const content = r ? sanitize(r.body||'') : '<p><br></p>';
-    quill.clipboard.dangerouslyPasteHTML(content);
-  } else {
-    D('ОШИБКА: Quill не инициализирован');
-  }
-  
+  if(quill){const content=r?sanitize(r.body||''):'<p><br></p>';quill.clipboard.dangerouslyPasteHTML(content);}
+  else{D('ОШИБКА: Quill не инициализирован');}
   document.getElementById('edImageUrl').value=r?(r.imageUrl||''):'';
   const p=document.getElementById('imgPreview');
   if(r&&r.imageUrl){p.src=r.imageUrl;p.style.display='block';}else{p.style.display='none';p.src='';}
@@ -272,25 +213,18 @@ async function saveRecord(){
     const cat=document.getElementById('edCat').value;if(!cat)throw new Error('Выбери категорию.');
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
-    
-    // Запускаем диагностику перед сохранением
-    debugAlign();
-    
-    const body = quill ? sanitize(quill.root.innerHTML) : '';
-    
+    const body=quill?sanitize(quill.root.innerHTML):'';
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
     let code,id;
     if(editingId){code=editingId.code;id=editingId.id;}
     else{const cs=await fbGetAll('categories');const c=cs.find(x=>x.name===cat);id=Date.now().toString();code=(c?c.prefix:'ЗАП')+'-'+id.slice(-4);}
-    
     const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await fbSet('records/'+id,rec);
     await addJournal(editingId?'РЕДАКТИРОВАНИЕ':'СОЗДАНИЕ',code);
     msg('edMsg','✓ Сохранено.',true);setTimeout(()=>viewRecord(rec),300);
-  }catch(e){msg('edMsg',e.message,false);D('ошибка сохранения: '+e.message);}
+  }catch(e){msg('edMsg',e.message,false);D('ошибка: '+e.message);}
 }
 
-/* ---------- КАТЕГОРИИ ---------- */
 async function renderCats(){const cs=await fbGetAll('categories');document.getElementById('catList').innerHTML=cs.map(c=>'<div class="rec" style="cursor:default"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join('');}
 async function addCategory(){
   const n=document.getElementById('newCatName').value.trim().toUpperCase(),p=document.getElementById('newCatPrefix').value.trim().toUpperCase()||'ЗАП';
@@ -299,10 +233,9 @@ async function addCategory(){
   msg('catMsg','✓ Добавлена.',true);fillCatSelect();renderCats();
 }
 
-/* ---------- СОВЕТ ---------- */
 async function renderCouncil(){
   const box=document.getElementById('userList');
-  if(ME.clearance<5){box.innerHTML='<p style="color:var(--err)">✖ Допуск 5.</p>';return;}
+  if(ME.clearance<5){box.innerHTML='<p style="color:var(--err)">✖ Требуется допуск 5.</p>';return;}
   const users=await fbGetAll('users');box.innerHTML='';
   users.forEach(u=>{
     const row=document.createElement('div');row.className='rec';row.style.cursor='default';
@@ -315,12 +248,12 @@ async function renderCouncil(){
     [1,2,3,4,5].forEach(n=>{const o=document.createElement('option');o.value=n;o.textContent='допуск '+n;if(n===u.clearance)o.selected=true;cl.appendChild(o);});
     cl.onchange=async()=>{u.clearance=parseInt(cl.value);await fbSet('users/'+u.id,u);await addJournal('ДОПУСК',u.name);if(u.name===ME.name){ME=u;sessionStorage.setItem('kodex_me',JSON.stringify(ME));await enterMain();}renderCouncil();};
     const pin=document.createElement('input');pin.type='password';pin.placeholder='новый PIN (мин. 4)';
-    const sp=document.createElement('button');sp.type='button';sp.textContent='СМЕНИТЬ PIN';
+    const sp=document.createElement('button');sp.type='button';sp.textContent='Сменить PIN';
     sp.onclick=async()=>{const v=pin.value;if(v.length<4){msg('councilMsg','PIN минимум 4 знака.',false);return;}
       u.salt=salt();u.pinHash=await hashPin(v,u.salt);await fbSet('users/'+u.id,u);await addJournal('СМЕНА PIN',u.name);
       if(u.name===ME.name){ME=u;sessionStorage.setItem('kodex_me',JSON.stringify(ME));}
       pin.value='';msg('councilMsg','✓ PIN обновлён: '+u.name,true);renderCouncil();};
-    const rm=document.createElement('button');rm.type='button';rm.className='danger';rm.textContent='✖ УДАЛИТЬ';
+    const rm=document.createElement('button');rm.type='button';rm.className='danger';rm.textContent='✖ Удалить';
     rm.onclick=async()=>{
       if(u.name===ME.name){msg('councilMsg','Себя нельзя.',false);return;}
       if(u.clearance>=5&&users.filter(x=>x.clearance>=5).length<=1){msg('councilMsg','Последний Магистр.',false);return;}
@@ -345,7 +278,6 @@ async function addUser(){
   }catch(e){msg('councilMsg',e.message,false);}
 }
 
-/* ---------- ЖУРНАЛ ---------- */
 async function addJournal(action,detail){try{await fbSet('journal/'+Date.now()+Math.random().toString(36).slice(2),{ts:now(),op:ME?ME.name:'система',action,detail:detail||''});}catch(e){}}
 async function renderJournal(){
   const box=document.getElementById('journalList');
@@ -354,7 +286,6 @@ async function renderJournal(){
   box.innerHTML=j.slice(0,150).map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join('')||'<p class="meta">Пусто.</p>';
 }
 
-/* ---------- ОБНОВЛЕНИЕ ---------- */
 async function forceUpdate(){
   try{
     if('serviceWorker' in navigator)for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();
@@ -363,19 +294,13 @@ async function forceUpdate(){
   }catch(e){alert(e.message);}
 }
 
-/* ---------- СТАРТ ---------- */
 (async()=>{
-  D('инициализация КОДЕКСА Firebase...');
+  D('инициализация КОДЕКСА...');
   try{
     await auth.signInAnonymously();D('авторизация выполнена');
     await ensureMaster();
-    
-    if(document.readyState==='loading'){
-      document.addEventListener('DOMContentLoaded',initEditor);
-    }else{
-      initEditor();
-    }
-    
+    if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initEditor);}
+    else{initEditor();}
     const saved=sessionStorage.getItem('kodex_me');
     if(saved){
       ME=JSON.parse(saved);
@@ -383,7 +308,7 @@ async function forceUpdate(){
       if(u&&u.pinHash===ME.pinHash){await enterMain();D('сессия восстановлена');return;}
       sessionStorage.removeItem('kodex_me');
     }
-  }catch(e){D('ОШИБКА: '+e.message);msg('authMsg','Ошибка базы: '+e.message,false);}
+  }catch(e){D('ОШИБКА: '+e.message);msg('authMsg','Ошибка: '+e.message,false);}
 })();
 
 if('serviceWorker' in navigator){
