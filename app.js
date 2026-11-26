@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 9 · Standard execCommand Editor ===
-const BUILD='build 9 (Standard Editor)';
+// === КОДЕКС PWA · build 9.1 · Standard execCommand Editor (Mobile Fix) ===
+const BUILD='build 9.1 (Standard Editor + Mobile Fix)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -44,11 +44,13 @@ function cleanNode(node){
 }
 function sanitize(html){const t=document.createElement('div');t.innerHTML=html||'';const o=document.createElement('div');t.childNodes.forEach(c=>o.appendChild(cleanNode(c)));return o.innerHTML;}
 
-/* ---------- РЕДАКТОР (СТАНДАРТНЫЙ) ---------- */
+/* ---------- РЕДАКТОР (СТАНДАРТНЫЙ + МОБИЛЬНЫЙ ФИКС) ---------- */
 function bodyEl(){return document.getElementById('edBody');}
 
 function applyStyle(cmd,val=null){
-  bodyEl().focus();
+  const el=bodyEl();
+  if(!el) return false;
+  el.focus();
   try{document.execCommand('styleWithCSS',false,false);}catch(e){}
   const ok=document.execCommand(cmd,false,val);
   refreshToolbar();
@@ -57,7 +59,6 @@ function applyStyle(cmd,val=null){
 
 function refreshToolbar(){
   const tb=document.getElementById('edToolbar');if(!tb)return;
-  // Проверяем состояние команд для подсветки кнопок
   ['bold','italic','underline','strikeThrough','justifyLeft','justifyCenter','justifyRight'].forEach(cmd=>{
     const btn=tb.querySelector(`[data-cmd="${cmd}"]`);
     if(btn){try{btn.classList.toggle('active',document.queryCommandState(cmd));}catch(e){}}
@@ -68,10 +69,14 @@ function initEditor(){
   const tb=document.getElementById('edToolbar'),el=bodyEl();
   if(!tb||!el){D('ОШИБКА редактора');return;}
   
-  // Обработчики кнопок: просто вызываем execCommand
+  // Обработчики кнопок с защитой для мобильных устройств
   tb.querySelectorAll('button').forEach(b=>{
+    // На мобильных preventDefault на mousedown/touchstart блокирует потерю выделения
+    b.addEventListener('mousedown',e=>e.preventDefault());
+    b.addEventListener('touchstart',e=>e.preventDefault(),{passive:false});
+    
     b.addEventListener('click',e=>{
-      e.preventDefault(); // предотвращаем потерю фокуса
+      e.preventDefault();
       if(b.dataset.cmd){
         applyStyle(b.dataset.cmd,b.dataset.val||null);
       }else if(b.dataset.block){
@@ -86,19 +91,17 @@ function initEditor(){
     });
   });
 
-  // Обновляем тулбар при изменении выделения или вводе
   el.addEventListener('keyup',refreshToolbar);
   el.addEventListener('mouseup',refreshToolbar);
   el.addEventListener('input',refreshToolbar);
   
-  // Вставка только чистого текста
   el.addEventListener('paste',e=>{
     e.preventDefault();
     const txt=(e.clipboardData||window.clipboardData).getData('text/plain');
     document.execCommand('insertText',false,txt);
   });
   
-  D('редактор инициализирован (стандартный режим)');
+  D('редактор инициализирован (стандартный режим + мобильный фикс)');
 }
 
 function selfTest(){
