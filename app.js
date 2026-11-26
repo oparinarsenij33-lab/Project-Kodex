@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 11.0 · Akasha Theme ===
-const BUILD='build 11.0 (Akasha Theme)';
+// === КОДЕКС PWA · build 11.2 · Akasha + Blockquote Fix ===
+const BUILD='build 11.2 (Akasha + Blockquote Fix)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -27,8 +27,9 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
+/* ---------- САНИТАЙЗЕР (выравнивание + цитаты) ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
-const ALIGN_CLASSES=['ql-align-center','ql-align-right','ql-align-justify'];
+const PRESERVE_CLASSES=['ql-align-center','ql-align-right','ql-align-justify','ql-indent-1','ql-indent-2','ql-indent-3'];
 
 function cleanNode(node){
   if(node.nodeType===3) return document.createTextNode(node.nodeValue);
@@ -39,12 +40,17 @@ function cleanNode(node){
   node.childNodes.forEach(c => kids.appendChild(cleanNode(c)));
   if(!ALLOWED.includes(tag)) return kids;
   const el=document.createElement(tag.toLowerCase());
+  
+  // Сохраняем полезные классы Quill (выравнивание, отступы цитат)
   if(node.className && typeof node.className === 'string'){
-    const alignClass = node.className.split(' ').find(c => ALIGN_CLASSES.includes(c));
-    if(alignClass) el.className = alignClass;
+    const kept = node.className.split(' ').filter(c => PRESERVE_CLASSES.includes(c));
+    if(kept.length > 0) el.className = kept.join(' ');
   }
+  
+  // Также поддерживаем inline text-align
   const al = node.style && node.style.textAlign;
   if(al && ['left','center','right','justify'].includes(al)) el.style.textAlign = al;
+  
   el.appendChild(kids);
   return el;
 }
@@ -56,6 +62,7 @@ function sanitize(html){
   return o.innerHTML;
 }
 
+/* ---------- ИНИЦИАЛИЗАЦИЯ QUILL ---------- */
 function initEditor(){
   if(quill) return;
   const toolbarOptions = [
@@ -86,11 +93,13 @@ function selfTest(){
   msg('edMsg',hasBold?'✓ Тест пройден':'✗ Тест провален',hasBold);
 }
 
+/* ---------- FIREBASE HELPERS ---------- */
 async function fbGet(path){const snap=await db.doc(path).get();return snap.exists?snap.data():null;}
 async function fbSet(path,data){await db.doc(path).set(data,{merge:true});}
 async function fbDelete(path){await db.doc(path).delete();}
 async function fbGetAll(colPath){const snap=await db.collection(colPath).get();return snap.docs.map(d=>({id:d.id,...d.data()}));}
 
+/* ---------- ПЕРВЫЙ ЗАПУСК ---------- */
 async function ensureMaster(){
   const users=await fbGetAll('users');
   if(users.length===0){
@@ -102,6 +111,7 @@ async function ensureMaster(){
   if(cats.length===0)for(const c of [{name:'ДОСЬЕ',prefix:'ДОС'},{name:'АНОМАЛИЯ',prefix:'АНО'},{name:'АРТЕФАКТ',prefix:'АРТ'},{name:'ПРОТОКОЛ',prefix:'ПРТ'},{name:'ЛОКАЦИЯ',prefix:'ЛОК'},{name:'ЗНАНИЕ',prefix:'ЗНН'}])await fbSet('categories/'+c.name,c);
 }
 
+/* ---------- ВХОД ---------- */
 async function login(){
   try{
     const nm=document.getElementById('loginName').value.trim(),p=document.getElementById('loginPass').value;
@@ -123,10 +133,12 @@ async function enterMain(){
   fillCatSelect();fillClearSelect();showTab('list');
 }
 
+/* ---------- ТАБЫ ---------- */
 const TABS=['list','view','editor','cats','council','journal'];
 function showTabRaw(t){TABS.forEach(x=>document.getElementById('tab-'+x).classList.toggle('hidden',x!==t));}
 function showTab(t){showTabRaw(t);if(t==='list')renderList();if(t==='cats')renderCats();if(t==='council')renderCouncil();if(t==='journal')renderJournal();}
 
+/* ---------- СПИСОК ---------- */
 async function renderList(){
   const q=(document.getElementById('searchBox').value||'').toLowerCase();
   const box=document.getElementById('recList');box.innerHTML='';
@@ -156,6 +168,7 @@ async function deleteRecord(r){
   catch(e){alert('Ошибка: '+e.message);}
 }
 
+/* ---------- ПРОСМОТР ---------- */
 function viewRecord(r){
   if((r.clearance||1)>ME.clearance){alert('Недостаточный допуск.');return;}
   const vc=document.getElementById('viewContent');
@@ -172,6 +185,7 @@ function viewRecord(r){
   showTabRaw('view');
 }
 
+/* ---------- РЕДАКТОР ЗАПИСИ ---------- */
 function fillCatSelect(){fbGetAll('categories').then(cs=>{const s=document.getElementById('edCat');s.innerHTML='';cs.forEach(c=>{const o=document.createElement('option');o.value=c.name;o.textContent=c.name;s.appendChild(o);});});}
 function fillClearSelect(){const s=document.getElementById('edClear');s.innerHTML='';for(let i=1;i<=ME.clearance;i++){const o=document.createElement('option');o.value=i;o.textContent='Допуск '+i;if(i===Math.min(3,ME.clearance))o.selected=true;s.appendChild(o);}}
 
@@ -225,6 +239,7 @@ async function saveRecord(){
   }catch(e){msg('edMsg',e.message,false);D('ошибка: '+e.message);}
 }
 
+/* ---------- КАТЕГОРИИ ---------- */
 async function renderCats(){const cs=await fbGetAll('categories');document.getElementById('catList').innerHTML=cs.map(c=>'<div class="rec" style="cursor:default"><span class="code">'+esc(c.prefix)+'</span> │ '+esc(c.name)+'</div>').join('');}
 async function addCategory(){
   const n=document.getElementById('newCatName').value.trim().toUpperCase(),p=document.getElementById('newCatPrefix').value.trim().toUpperCase()||'ЗАП';
@@ -233,6 +248,7 @@ async function addCategory(){
   msg('catMsg','✓ Добавлена.',true);fillCatSelect();renderCats();
 }
 
+/* ---------- СОВЕТ ---------- */
 async function renderCouncil(){
   const box=document.getElementById('userList');
   if(ME.clearance<5){box.innerHTML='<p style="color:var(--err)">✖ Требуется допуск 5.</p>';return;}
@@ -278,6 +294,7 @@ async function addUser(){
   }catch(e){msg('councilMsg',e.message,false);}
 }
 
+/* ---------- ЖУРНАЛ ---------- */
 async function addJournal(action,detail){try{await fbSet('journal/'+Date.now()+Math.random().toString(36).slice(2),{ts:now(),op:ME?ME.name:'система',action,detail:detail||''});}catch(e){}}
 async function renderJournal(){
   const box=document.getElementById('journalList');
@@ -286,6 +303,7 @@ async function renderJournal(){
   box.innerHTML=j.slice(0,150).map(x=>'<div class="journal-line">'+esc(x.ts)+' │ '+esc(x.op)+' │ '+esc(x.action)+' │ '+esc(x.detail)+'</div>').join('')||'<p class="meta">Пусто.</p>';
 }
 
+/* ---------- ОБНОВЛЕНИЕ ---------- */
 async function forceUpdate(){
   try{
     if('serviceWorker' in navigator)for(const r of await navigator.serviceWorker.getRegistrations())await r.unregister();
@@ -294,6 +312,7 @@ async function forceUpdate(){
   }catch(e){alert(e.message);}
 }
 
+/* ---------- СТАРТ ---------- */
 (async()=>{
   D('инициализация КОДЕКСА...');
   try{
