@@ -3,152 +3,176 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>КОДЕКС — АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ</title>
+<title>КОДЕКС — Архив Ордена Вольных Джедаев</title>
 <link rel="manifest" href="manifest.json">
-<meta name="theme-color" content="#020610">
+<meta name="theme-color" content="#f5f0e6">
 <!-- Quill CSS -->
 <link href="https://cdn.quilljs.com/1.3.7/quill.snow.css" rel="stylesheet">
+<!-- Google Fonts для стиля Акаши -->
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=EB+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#020610;--panel:#061224;--holo:#4fc3f7;--holo2:#81d4fa;--dim:#1b4a6b;--warn:#ffb74d;--err:#ef5350;--ok:#69f0ae}
+:root{
+  --bg:#f5f0e6;
+  --panel:#faf7f0;
+  --text:#3d3425;
+  --text-secondary:#6b5e4b;
+  --accent:#8b7355;
+  --accent-light:#a89070;
+  --border:#d4c9b8;
+  --gold:#b8976a;
+  --gold-dark:#8b6f47;
+  --err:#c0392b;
+  --ok:#27ae60;
+  --shadow:rgba(139,115,85,.12);
+}
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:var(--bg);color:var(--holo);font-family:"Consolas","Courier New",monospace;min-height:100vh;padding-bottom:150px}
-body::before{content:"";position:fixed;inset:0;background:repeating-linear-gradient(0deg,transparent 0 2px,rgba(79,195,247,.03) 2px 4px);pointer-events:none;z-index:99}
-.wrap{max-width:900px;margin:0 auto;padding:16px}
-h1{text-align:center;font-size:clamp(15px,4vw,26px);letter-spacing:4px;text-shadow:0 0 12px var(--holo);padding:18px 0 4px}
-.sub{text-align:center;color:var(--dim);font-size:12px;margin-bottom:18px}
-.panel{background:var(--panel);border:1px solid var(--dim);border-radius:6px;padding:16px;margin-bottom:14px;box-shadow:0 0 18px rgba(79,195,247,.12) inset}
-input,select{width:100%;background:#03101f;border:1px solid var(--dim);color:var(--holo2);font-family:inherit;font-size:15px;padding:10px;border-radius:4px;margin:6px 0}
-input:focus,select:focus{outline:none;border-color:var(--holo);box-shadow:0 0 8px rgba(79,195,247,.4)}
-button{background:transparent;border:1px solid var(--holo);color:var(--holo);font-family:inherit;font-size:14px;padding:10px 14px;border-radius:4px;cursor:pointer;margin:4px 4px 4px 0;text-shadow:0 0 6px rgba(79,195,247,.6)}
-button:hover{background:rgba(79,195,247,.15);box-shadow:0 0 12px rgba(79,195,247,.5)}
+body{background:var(--bg);color:var(--text);font-family:"EB Garamond","Cormorant Garamond",Georgia,"Times New Roman",serif;font-size:17px;line-height:1.7;min-height:100vh;padding-bottom:150px}
+.wrap{max-width:860px;margin:0 auto;padding:24px 20px}
+h1{text-align:center;font-family:"Cormorant Garamond",serif;font-size:clamp(22px,5vw,34px);letter-spacing:6px;color:var(--gold-dark);padding:24px 0 6px;font-weight:700}
+.sub{text-align:center;color:var(--text-secondary);font-size:14px;margin-bottom:24px;font-style:italic;letter-spacing:1px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:20px;margin-bottom:16px;box-shadow:0 2px 12px var(--shadow)}
+input,select{width:100%;background:#fff;border:1px solid var(--border);color:var(--text);font-family:inherit;font-size:16px;padding:10px 12px;border-radius:6px;margin:6px 0;transition:border-color .2s}
+input:focus,select:focus{outline:none;border-color:var(--gold);box-shadow:0 0 0 2px rgba(184,151,106,.2)}
+button{background:transparent;border:1px solid var(--accent);color:var(--accent);font-family:inherit;font-size:14px;padding:10px 16px;border-radius:6px;cursor:pointer;margin:4px 4px 4px 0;letter-spacing:.5px;transition:all .2s;font-weight:600}
+button:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
 button.danger{border-color:var(--err);color:var(--err)}
+button.danger:hover{background:var(--err);color:#fff}
 .row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1;min-width:120px}
-.msg{padding:10px;border-radius:4px;margin:8px 0;font-size:14px;display:none}
-.msg.ok{display:block;color:var(--ok);border:1px solid var(--ok)}
-.msg.err{display:block;color:var(--err);border:1px solid var(--err)}
-.rec{border:1px solid var(--dim);border-left:3px solid var(--holo);padding:10px;margin:8px 0;border-radius:4px;cursor:pointer}
-.rec:hover{background:rgba(79,195,247,.08)}
-.code{color:var(--warn)}.locked{color:var(--dim)}
-.meta{color:var(--dim);font-size:12px;margin:4px 0}
-.body-text{white-space:normal;color:var(--holo2);line-height:1.5;padding:10px 0}
-.tag{display:inline-block;border:1px solid var(--dim);border-radius:10px;padding:1px 8px;font-size:11px;margin:2px;color:var(--holo2)}
+.msg{padding:10px;border-radius:6px;margin:8px 0;font-size:14px;display:none}
+.msg.ok{display:block;color:var(--ok);border:1px solid var(--ok);background:rgba(39,174,96,.08)}
+.msg.err{display:block;color:var(--err);border:1px solid var(--err);background:rgba(192,57,43,.08)}
+.rec{border:1px solid var(--border);border-left:3px solid var(--gold);padding:12px 14px;margin:8px 0;border-radius:6px;cursor:pointer;background:var(--panel);transition:all .2s}
+.rec:hover{background:#fff;box-shadow:0 2px 8px var(--shadow);border-left-color:var(--gold-dark)}
+.code{color:var(--gold-dark);font-weight:700;font-family:"Cormorant Garamond",serif;font-size:18px}
+.locked{color:var(--text-secondary);font-style:italic}
+.meta{color:var(--text-secondary);font-size:13px;margin:4px 0}
+.body-text{white-space:normal;color:var(--text);line-height:1.8;padding:10px 0;font-size:17px}
+.body-text ol,.body-text ul{padding-left:24px;margin:12px 0}
+.body-text li{margin:6px 0}
+.tag{display:inline-block;border:1px solid var(--border);border-radius:12px;padding:2px 10px;font-size:12px;margin:2px;color:var(--text-secondary);background:var(--panel)}
 .hidden{display:none!important}
-.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:13px;color:var(--holo2);margin-bottom:10px}
-.journal-line{font-size:12px;color:var(--dim);padding:2px 0;border-bottom:1px dashed #0a2236}
-.glow{animation:pulse 2.5s infinite}
-@keyframes pulse{0%,100%{text-shadow:0 0 8px var(--holo)}50%{text-shadow:0 0 22px var(--holo)}}
-label{font-size:12px;color:var(--dim)}
-#diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:150px;overflow:auto;background:#03101f;border:1px solid var(--dim);border-radius:6px;padding:6px 8px;font-size:11px;color:var(--dim);z-index:100}
-#diag b{color:var(--holo2)}
-.img-preview{max-width:100%;max-height:300px;border:1px solid var(--dim);border-radius:4px;margin-top:8px;display:none}
-.img-dossier{max-width:100%;border-radius:4px;border:1px solid var(--dim);margin-top:10px;display:block}
+.topbar{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;font-size:14px;color:var(--text-secondary);margin-bottom:12px;font-family:"Cormorant Garamond",serif;font-weight:600;letter-spacing:.5px}
+.journal-line{font-size:13px;color:var(--text-secondary);padding:3px 0;border-bottom:1px solid var(--border)}
+label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
+#diag{position:fixed;left:8px;right:8px;bottom:8px;max-height:140px;overflow:auto;background:var(--panel);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-size:11px;color:var(--text-secondary);z-index:100;font-family:"Consolas",monospace}
+#diag b{color:var(--accent)}
+.img-preview{max-width:100%;max-height:300px;border:1px solid var(--border);border-radius:6px;margin-top:8px;display:none}
+.img-dossier{max-width:100%;border-radius:6px;border:1px solid var(--border);margin-top:12px;display:block}
 
-/* Стили для Quill под тему КОДЕКС */
-.ql-toolbar{background:#03101f;border:1px solid var(--dim)!important;border-radius:4px 4px 0 0;position:sticky;top:0;z-index:50}
-.ql-container{background:#03101f;border:1px solid var(--dim)!important;border-radius:0 0 4px 4px;color:var(--holo2);font-family:inherit;font-size:15px;min-height:220px}
-.ql-editor{color:var(--holo2);min-height:220px}
-.ql-editor h1,.ql-editor h2,.ql-editor h3{color:var(--holo);margin:10px 0 5px}
-.ql-editor blockquote{border-left:3px solid var(--dim);padding-left:10px;color:var(--dim)}
-.ql-stroke{stroke:var(--holo)!important}
-.ql-fill{fill:var(--holo)!important}
-.ql-picker-label,.ql-picker-item{color:var(--holo2)!important}
-.ql-active .ql-stroke{stroke:#fff!important}
-.ql-active .ql-fill{fill:#fff!important}
+/* Quill в стиле Акаши */
+.ql-toolbar{background:var(--panel)!important;border:1px solid var(--border)!important;border-radius:6px 6px 0 0}
+.ql-container{background:#fff!important;border:1px solid var(--border)!important;border-radius:0 0 6px 6px;color:var(--text);font-family:inherit;font-size:17px;min-height:240px}
+.ql-editor{color:var(--text);min-height:240px;font-size:17px;line-height:1.7}
+.ql-editor h1,.ql-editor h2,.ql-editor h3{color:var(--gold-dark);margin:12px 0 6px;font-family:"Cormorant Garamond",serif}
+.ql-editor blockquote{border-left:3px solid var(--gold);padding-left:12px;color:var(--text-secondary);font-style:italic}
+.ql-stroke{stroke:var(--accent)!important}
+.ql-fill{fill:var(--accent)!important}
+.ql-picker-label,.ql-picker-item{color:var(--text)!important;font-family:inherit}
+.ql-active .ql-stroke{stroke:var(--gold-dark)!important}
+.ql-active .ql-fill{fill:var(--gold-dark)!important}
+.ql-toolbar button:hover .ql-stroke{stroke:var(--gold-dark)!important}
+.ql-toolbar button:hover .ql-fill{fill:var(--gold-dark)!important}
 
-/* Поддержка выравнивания вне редактора */
-.ql-align-center { text-align: center !important; }
-.ql-align-right { text-align: right !important; }
-.ql-align-justify { text-align: justify !important; }
+/* Выравнивание вне редактора */
+.ql-align-center{text-align:center!important}
+.ql-align-right{text-align:right!important}
+.ql-align-justify{text-align:justify!important}
+
+/* Фикс списков — никогда не вылезут */
+.body-text ol,.body-text ul{list-style-position:inside;padding-left:0;margin:12px 0}
+.body-text li{margin:6px 0;padding-left:4px}
+.editor-content ol,.editor-content ul{list-style-position:inside;padding-left:0}
 </style>
 </head>
 <body>
 <div class="wrap">
-<h1 class="glow">⟡ К О Д Е К С ⟡</h1>
-<div class="sub">АРХИВ ОРДЕНА ВОЛЬНЫХ ДЖЕДАЕВ · «Знание — свет. Свет — Сила.»</div>
+<h1>⟡ К О Д Е К С ⟡</h1>
+<div class="sub">Архив Ордена Вольных Джедаев · «Знание — свет. Свет — Сила.»</div>
 
 <div id="authScreen" class="panel">
-  <p>ИДЕНТИФИКАЦИЯ ОПЕРАТОРА</p>
+  <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark);margin-bottom:12px">Идентификация оператора</p>
   <input id="loginName" placeholder="Имя оператора" autocomplete="off">
   <input id="loginPass" type="password" placeholder="PIN-код" onkeydown="if(event.key==='Enter')login()">
-  <button type="button" onclick="login()">ВОЙТИ В АРХИВ</button>
+  <button type="button" onclick="login()" style="width:100%;margin-top:8px;padding:12px;font-size:15px">Войти в Архив</button>
   <div id="authMsg" class="msg"></div>
 </div>
 
 <div id="mainScreen" class="hidden">
-  <div class="topbar"><span id="topInfo"></span><span><button type="button" onclick="logout()">ВЫХОД</button></span></div>
+  <div class="topbar"><span id="topInfo"></span><span><button type="button" onclick="logout()">Выход</button></span></div>
   <div class="panel">
     <input id="searchBox" placeholder="🔍 Фильтр: название, тег, код…" oninput="renderList()">
     <div class="row">
-      <button type="button" onclick="openEditor()">＋ НОВАЯ ЗАПИСЬ</button>
-      <button type="button" onclick="showTab('list')">АРХИВ</button>
-      <button type="button" onclick="showTab('cats')">КАТЕГОРИИ</button>
-      <button type="button" id="journalBtn" onclick="showTab('journal')">ЖУРНАЛ</button>
-      <button type="button" id="councilBtn" onclick="showTab('council')">СОВЕТ</button>
-      <button type="button" onclick="forceUpdate()">⟳ ОБНОВИТЬ</button>
+      <button type="button" onclick="openEditor()">＋ Новая запись</button>
+      <button type="button" onclick="showTab('list')">Архив</button>
+      <button type="button" onclick="showTab('cats')">Категории</button>
+      <button type="button" id="journalBtn" onclick="showTab('journal')">Журнал</button>
+      <button type="button" id="councilBtn" onclick="showTab('council')">Совет</button>
+      <button type="button" onclick="forceUpdate()">⟳ Обновить</button>
     </div>
   </div>
 
   <div id="tab-list" class="panel"><div id="recList"></div></div>
 
   <div id="tab-view" class="panel hidden">
-    <button type="button" onclick="showTab('list')">← НАЗАД</button>
+    <button type="button" onclick="showTab('list')" style="margin-bottom:12px">← Назад</button>
     <div id="viewContent"></div>
   </div>
 
   <div id="tab-editor" class="panel hidden">
-    <p id="editorTitle">─── НОВАЯ ЗАПИСЬ ───</p>
+    <p id="editorTitle" style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Новая запись ───</p>
     <input id="edTitle" placeholder="Название записи">
     <div class="row"><select id="edCat"></select><select id="edClear"></select></div>
     <input id="edTags" placeholder="Теги через запятую">
     <input id="edSource" placeholder="Источник / ссылка">
     <label>Текст досье:</label>
-    <!-- Контейнер для Quill -->
     <div id="editor"></div>
-    <button type="button" onclick="selfTest()">🧪 ТЕСТ РЕДАКТОРА</button>
+    <button type="button" onclick="selfTest()" style="margin-top:8px">🧪 Тест редактора</button>
     <label>Ссылка на фото (из альбома ВК):</label>
     <input id="edImageUrl" placeholder="https://sun9-xx.vkuserphoto.ru/...">
     <img id="imgPreview" class="img-preview">
-    <div>
-      <button type="button" onclick="clearPhoto()">УБРАТЬ ФОТО</button>
-      <button type="button" onclick="saveRecord()">💾 СОХРАНИТЬ</button>
-      <button type="button" onclick="showTab('list')">ОТМЕНА</button>
+    <div style="margin-top:12px">
+      <button type="button" onclick="clearPhoto()">Убрать фото</button>
+      <button type="button" onclick="saveRecord()" style="background:var(--gold);color:#fff;border-color:var(--gold)">💾 Сохранить</button>
+      <button type="button" onclick="showTab('list')">Отмена</button>
     </div>
     <div id="edMsg" class="msg"></div>
   </div>
 
   <div id="tab-cats" class="panel hidden">
-    <p>─── КАТЕГОРИИ ───</p><div id="catList"></div>
-    <div class="row"><input id="newCatName" placeholder="Новая категория"><input id="newCatPrefix" placeholder="Префикс" maxlength="3"></div>
-    <button type="button" onclick="addCategory()">ДОБАВИТЬ КАТЕГОРИЮ</button>
+    <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Категории ───</p>
+    <div id="catList"></div>
+    <div class="row" style="margin-top:12px"><input id="newCatName" placeholder="Новая категория"><input id="newCatPrefix" placeholder="Префикс" maxlength="3"></div>
+    <button type="button" onclick="addCategory()" style="margin-top:8px">Добавить категорию</button>
     <div id="catMsg" class="msg"></div>
   </div>
 
-  <div id="tab-journal" class="panel hidden"><p>─── ЖУРНАЛ ДОСТУПА ───</p><div id="journalList"></div></div>
+  <div id="tab-journal" class="panel hidden">
+    <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Журнал доступа ───</p>
+    <div id="journalList"></div>
+  </div>
 
   <div id="tab-council" class="panel hidden">
-    <p>─── СОВЕТ: ОПЕРАТОРЫ И ДОСТУП ───</p>
+    <p style="font-family:'Cormorant Garamond',serif;font-size:20px;font-weight:600;color:var(--gold-dark)">─── Совет: операторы и доступ ───</p>
     <div id="userList"></div>
-    <p class="meta" style="margin-top:12px">Новый оператор:</p>
+    <p class="meta" style="margin-top:16px;font-size:14px">Новый оператор:</p>
     <input id="nuName" placeholder="Имя">
     <input id="nuPin" type="password" placeholder="PIN-код (мин. 4 знака)">
     <div class="row">
-      <select id="nuRole"><option>ПАДАВАН</option><option selected>РЫЦАРЬ</option><option>МАСТЕР</option><option>СОВЕТ</option><option>МАГИСТР</option></select>
+      <select id="nuRole"><option>Падаван</option><option selected>Рыцарь</option><option>Мастер</option><option>Совет</option><option>Магистр</option></select>
       <select id="nuClear"><option value="1">допуск 1</option><option value="2" selected>допуск 2</option><option value="3">допуск 3</option><option value="4">допуск 4</option><option value="5">допуск 5</option></select>
     </div>
-    <button type="button" onclick="addUser()">ДОБАВИТЬ ОПЕРАТОРА</button>
+    <button type="button" onclick="addUser()" style="margin-top:8px">Добавить оператора</button>
     <div id="councilMsg" class="msg"></div>
   </div>
 </div>
-<div class="sub">Firebase Firestore · PWA · Offline-first</div>
+<div class="sub" style="margin-top:24px">Firebase Firestore · PWA · Offline-first</div>
 </div>
-<div id="diag"><b>ЖУРНАЛ ДИАГНОСТИКИ</b></div>
+<div id="diag"><b>Журнал диагностики</b></div>
 
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
-<!-- Quill JS -->
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-
-<script src="app.js?v=10.6"></script>
+<script src="app.js?v=11.0"></script>
 </body>
 </html>
