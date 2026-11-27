@@ -32,7 +32,9 @@ button.danger:hover{background:var(--err);color:#fff}
 .msg.err{display:block;color:var(--err);border:1px solid var(--err);background:rgba(192,57,43,.08)}
 .rec{border:1px solid var(--border);border-left:3px solid var(--gold);padding:12px 14px;margin:8px 0;border-radius:6px;cursor:pointer;background:var(--panel)}
 .rec:hover{background:#fff;box-shadow:0 2px 8px var(--shadow)}
-.code{color:var(--gold-dark);font-weight:700;font-family:"Cormorant Garamond",serif;font-size:18px}
+/* Исправлено: префикс категории теперь жирный и золотой */
+.code{color:var(--gold-dark);font-weight:700;font-family:"Cormorant Garamond",serif;font-size:18px;margin-right:8px}
+.code-prefix{color:var(--gold);font-weight:700;font-family:"Cormorant Garamond",serif;font-size:18px;margin-right:4px}
 .locked{color:var(--text-secondary);font-style:italic}
 .meta{color:var(--text-secondary);font-size:13px;margin:4px 0}
 .body-text{white-space:normal;color:var(--text);line-height:1.8;padding:10px 0;font-size:17px}
@@ -62,23 +64,12 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
 .ql-align-center{text-align:center!important}
 .ql-align-right{text-align:right!important}
 .ql-align-justify{text-align:justify!important}
-
-/* Универсальная поддержка цитат и отступов */
-.body-text blockquote,
-.body-text [style*="margin-left"],
-.body-text [style*="padding-left"]{
-  border-left:3px solid var(--gold)!important;
-  padding-left:16px!important;
-  margin-left:8px!important;
-  font-style:italic!important;
-  color:var(--text-secondary)!important;
+.body-text blockquote,.body-text [style*="margin-left"],.body-text [style*="padding-left"]{
+  border-left:3px solid var(--gold)!important;padding-left:16px!important;margin-left:8px!important;
+  font-style:italic!important;color:var(--text-secondary)!important;
 }
-.body-text .ql-indent-1,
-.body-text .ql-indent-2,
-.body-text .ql-indent-3{
-  margin-left:24px!important;
-  font-style:italic!important;
-  color:var(--text-secondary)!important;
+.body-text .ql-indent-1,.body-text .ql-indent-2,.body-text .ql-indent-3{
+  margin-left:24px!important;font-style:italic!important;color:var(--text-secondary)!important;
 }
 </style>
 </head>
@@ -165,6 +156,6 @@ label{font-size:13px;color:var(--text-secondary);display:block;margin-top:8px}
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/11.6.0/firebase-firestore-compat.js"></script>
 <script src="https://cdn.quilljs.com/1.3.7/quill.min.js"></script>
-<script src="app.js?v=11.4"></script>
+<script src="app.js?v=11.6"></script>
 </body>
 </html>
