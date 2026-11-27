@@ -1,5 +1,5 @@
-// === КОДЕКС PWA · build 11.3 · Akasha + Blockquote Debug ===
-const BUILD='build 11.3 (Akasha + Blockquote Debug)';
+// === КОДЕКС PWA · build 11.5 · Akasha + Code Prefix Fix ===
+const BUILD='build 11.5 (Akasha + Code Prefix Fix)';
 
 function D(t){const el=document.getElementById('diag');if(!el)return;const d=document.createElement('div');d.textContent=new Date().toLocaleTimeString()+' › '+t;el.appendChild(d);el.scrollTop=el.scrollHeight;console.log('[КОДЕКС]',t);}
 D('КОДЕКС '+BUILD+' загружен');
@@ -27,7 +27,7 @@ function now(){return new Date().toLocaleString('ru-RU');}
 async function hashPin(p,salt){const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(salt+'::'+p));return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');}
 function salt(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
 
-/* ---------- САНИТАЙЗЕР (универсальный) ---------- */
+/* ---------- САНИТАЙЗЕР ---------- */
 const ALLOWED=['B','STRONG','I','EM','U','S','STRIKE','BR','P','DIV','SPAN','H1','H2','H3','H4','UL','OL','LI','BLOCKQUOTE'];
 
 function cleanNode(node){
@@ -39,13 +39,9 @@ function cleanNode(node){
   node.childNodes.forEach(c => kids.appendChild(cleanNode(c)));
   if(!ALLOWED.includes(tag)) return kids;
   const el=document.createElement(tag.toLowerCase());
-  
-  // Сохраняем ВСЕ классы (выравнивание, отступы, цитаты)
   if(node.className && typeof node.className === 'string' && node.className.trim()){
     el.className = node.className.trim();
   }
-  
-  // Сохраняем inline стили только для text-align и margin-left (цитаты)
   if(node.style){
     if(node.style.textAlign && ['left','center','right','justify'].includes(node.style.textAlign)){
       el.style.textAlign = node.style.textAlign;
@@ -55,7 +51,6 @@ function cleanNode(node){
       el.style.fontStyle = 'italic';
     }
   }
-  
   el.appendChild(kids);
   return el;
 }
@@ -160,6 +155,7 @@ async function renderList(){
     if(q&&!((r.title||'')+(r.tags||'')+r.code+(r.category||'')+(r.source||'')).toLowerCase().includes(q))continue;
     const d=document.createElement('div');d.className='rec';
     const info=document.createElement('div');
+    // Исправлено: используем r.code напрямую, он уже содержит правильный префикс
     info.innerHTML='<span class="code">'+esc(r.code)+'</span> │ <b>'+esc(r.title)+'</b><div class="meta">'+esc(r.category)+' · допуск '+(r.clearance||1)+' · '+esc(r.updated||'')+'</div>';
     info.onclick=()=>viewRecord(r);d.appendChild(info);
     if(ME.clearance>=4){const b=document.createElement('button');b.type='button';b.className='danger';b.textContent='✖ Удалить';b.onclick=ev=>{ev.stopPropagation();deleteRecord(r);};d.appendChild(b);}
@@ -233,20 +229,26 @@ async function saveRecord(){
     const cl=parseInt(document.getElementById('edClear').value);
     if(cl>ME.clearance)throw new Error('Допуск выше своего.');
     
-    // Диагностика: показываем raw HTML цитат
-    const rawHtml = quill ? quill.root.innerHTML : '';
-    const hasBlockquote = rawHtml.includes('<blockquote');
-    D('DEBUG: есть blockquote='+hasBlockquote);
-    if(hasBlockquote){
-      const bqMatch = rawHtml.match(/<blockquote[^>]*>.*?<\/blockquote>/s);
-      if(bqMatch) D('DEBUG blockquote HTML: '+bqMatch[0].substring(0,200));
-    }
-    
-    const body=quill?sanitize(rawHtml):'';
+    const body=quill?sanitize(quill.root.innerHTML):'';
     const imageUrl=document.getElementById('edImageUrl').value.trim()||null;
     let code,id;
-    if(editingId){code=editingId.code;id=editingId.id;}
-    else{const cs=await fbGetAll('categories');const c=cs.find(x=>x.name===cat);id=Date.now().toString();code=(c?c.prefix:'ЗАП')+'-'+id.slice(-4);}
+    
+    // Исправлено: получаем префикс из выбранной категории
+    const categories = await fbGetAll('categories');
+    const selectedCat = categories.find(c => c.name === cat);
+    const prefix = selectedCat ? selectedCat.prefix : 'ЗАП';
+    
+    if(editingId){
+      // При редактировании сохраняем старый код
+      code=editingId.code;
+      id=editingId.id;
+    } else {
+      // При создании новой записи генерируем код с правильным префиксом
+      id=Date.now().toString();
+      code=prefix+'-'+id.slice(-4);
+      D('Создан код: '+code+' (префикс: '+prefix+')');
+    }
+    
     const rec={id,code,title,category:cat,clearance:cl,tags:document.getElementById('edTags').value.trim(),source:document.getElementById('edSource').value.trim(),body,imageUrl,author:editingId?editingId.author:ME.name,updated:now(),updatedAt:firebase.firestore.FieldValue.serverTimestamp()};
     await fbSet('records/'+id,rec);
     await addJournal(editingId?'РЕДАКТИРОВАНИЕ':'СОЗДАНИЕ',code);
